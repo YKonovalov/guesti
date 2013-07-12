@@ -1,0 +1,48 @@
+%define pyver %nil
+%define __python /usr/bin/python
+%define python_sitearch %(%{__python} -c 'from distutils import sysconfig; print sysconfig.get_python_lib(1)')
+
+Summary:  Cloud machine image build automation tool
+Name:     guesti
+Version:  @VERSION@
+Release:  1%{?dist}
+License:  GPLv3+
+Group:    Applications/System
+
+Requires:       %lib = %version-%release
+Provides:       %name = %version-%release
+
+URL:        https://github.com/ykonovalov/guesti
+BuildRoot:  %_tmppath/%name-%version-root
+BuildArch:  noarch
+
+Source0: guesti-%version.tar.gz
+
+%description
+@DESCRIPTION@
+
+%prep
+%setup -q
+
+%build
+%__python setup.py build
+%__python setup.py build_sphinx
+
+%install
+[ %buildroot = "/" ] || rm -rf %buildroot
+%__python setup.py install \
+	--skip-build \
+	--root="%buildroot" \
+	--prefix="%_prefix" \
+	--install-lib="%python_sitearch"
+
+find %buildroot/ -name '*.egg-info' -exec rm -rf -- '{}' '+'
+
+%files
+%_bindir/*
+%python_sitearch/guesti
+%doc COPYING README.md DESCRIPTION build/sphinx/html
+
+%changelog
+* Fri Jun 21 2013 Yury Konovalov <YKonovalov@gmail.com> - 0.0.1-1
+- Initial spec file

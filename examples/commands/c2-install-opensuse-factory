@@ -1,0 +1,8 @@
+U=http://mirror.yandex.ru/opensuse/factory/repo/oss
+# Installer sometimes is not stable in factory.
+B=http://mirror.yandex.ru/opensuse/factory-tested/repo/oss
+
+guesti c2 install --ipxe-snapshot-id snap-5B0909A9\
+    --template-name "openSUSE factory" \
+    --initrd  $U/boot/x86_64/loader/initrd \
+    --kernel "$U/boot/x86_64/loader/linux install=$U autoyast=http://storage.cloud.croc.ru/kss/openSUSE-factory textmode=1"

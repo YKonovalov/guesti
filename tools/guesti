@@ -1,0 +1,76 @@
+#!/usr/bin/env python
+#
+# This file is part of GuestI.
+#
+# GuestI is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# SSP is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with GuestI.  If not, see <http://www.gnu.org/licenses/>.
+
+import argparse
+import logging
+import guesti.cloud
+from guesti.cloud.common import ABS_CLOUD
+import guesti.output
+import guesti.constants
+
+clouds = {}
+
+parser = argparse.ArgumentParser(
+    description='GuestI (Guest Installer) is a cloud machine image build automation tool',
+    version=guesti.constants.VERSION)
+
+p_cloud = parser.add_subparsers(title='Supported clouds', help=False, dest='cloud')
+for module_name in guesti.cloud.__enabled__:
+    module = __import__("guesti.cloud." + module_name, globals(), locals(), ['add_args_to_parser'], -1)
+    module.add_args_to_parser(p_cloud)
+    for cloud in ABS_CLOUD.__subclasses__():
+        clouds[cloud.name] = cloud
+
+misc = parser.add_argument_group('Miscellaneous Parameters')
+misc.add_argument('--rotate', dest='rotate', action='store_true', default=False,
+                  help='Disable previous template after successfull build of a new one')
+misc.add_argument('--skip-cleanup', dest='cleanup', action='store_false', default=True,
+                  help='Do not clean up temporary objects on exit')
+misc.add_argument('--debug', dest='debug', action='store_true', default=False,
+                  help='Enable debug messages')
+misc.add_argument('--quiet', dest='quiet', action='store_true', default=False,
+                  help='Do not output anything')
+
+args = parser.parse_args()
+
+# Output options
+terminal_loglevel = logging.INFO
+syslog_loglevel = logging.INFO
+
+if args.debug:
+    terminal_loglevel = logging.DEBUG
+    syslog_loglevel = logging.DEBUG
+if args.quiet:
+    terminal_loglevel = None
+    syslog_loglevel = logging.INFO
+# Set up logging
+LOG = guesti.output.setup_top_logger(guesti.constants.PROGRAM_NAME, syslog_loglevel, terminal_loglevel)
+LOG.debug("Output initialized")
+
+# Runtime params
+cleanup = args.cleanup
+rotate = args.rotate
+LOG.debug("Runtime params initialized")
+
+# cloud
+cloud = args.cloud
+LOG.debug("Cloud: {0}".format(cloud))
+if cloud in clouds.keys():
+    mycloud = clouds[cloud](args)
+    LOG.debug("Cloud module {0}".format(mycloud.name))
+    if args.command:
+        getattr(mycloud, args.command)()

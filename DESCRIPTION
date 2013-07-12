@@ -1,0 +1,9 @@
+GuestI (Guest Installer) is a cloud machine image build automation tool.
+The main idea is to facilate the fact that majority of operating systems
+nowdays have their distribution and installer on the internet. So, to
+create a machine template all we need - is to boot and perform a scripted
+install of a selected OS directly from the internet. Cloud supported:
+ -C2 Croc Cloud platform
+
+To boot a guest of the internet this tool needs iPXE loader, specifically
+configured to read boot commands from the cloud metadata URL.

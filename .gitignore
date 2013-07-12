@@ -1,0 +1,4 @@
+*.pyc
+build/
+dist/
+guesti.egg-info/

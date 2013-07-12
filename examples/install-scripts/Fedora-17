@@ -1,0 +1,126 @@
+# Fedora 17 kickstart customized for C2 (CROC Cloud).
+#
+# Based (with minimal changes) on original Fedora cloud kickstart
+#  http://git.fedorahosted.org/cgit/cloud-kickstarts.git/tree/ec2/fedora-17-x86_64-ec2.ks
+
+lang en_US.UTF-8
+keyboard us
+timezone --utc Europe/Moscow
+auth --useshadow --enablemd5
+selinux --enforcing
+firewall --service=ssh
+network --bootproto=dhcp --device=eth0 --onboot=on
+services --enabled=network,sshd,rsyslog
+
+# By default the root password is emptied
+
+#
+# Define how large you want your rootfs to be
+# NOTE: S3-backed AMIs have a limit of 10G
+#
+text
+poweroff
+skipx
+rootpw --lock !!
+
+ignoredisk --only-use=vda
+clearpart --all --drives=vda
+zerombr
+bootloader --location=mbr --driveorder=vda
+
+part /boot --fstype=ext4 --size=500
+part pv.rootdisk --grow --size=1
+volgroup bootvols --pesize=4096 pv.rootdisk
+logvol / --fstype=ext4 --name=root --vgname=bootvols --grow --size=6200 --grow
+logvol swap --name=swap --vgname=bootvols --grow --size=1024 --maxsize=10048
+
+#
+# Repositories
+# add Everything repo for cloud-init and reqs.
+repo --name=ifedora         --baseurl=http://mirror.yandex.ru/fedora/linux/releases/17/Everything/x86_64/os
+repo --name=ifedora-updates --baseurl=http://mirror.yandex.ru/fedora/linux/updates/17/x86_64
+
+#repo --name=fedora         --baseurl=http://dl.fedoraproject.org/pub/fedora/linux/releases/17/Everything/$basearch/os
+#repo --name=fedora-updates --baseurl=http://dl.fedoraproject.org/pub/fedora/linux/updates/17/$basearch
+#
+#repo --name=ifedora         --baseurl=http://download.fedoraproject.org/pub/fedora/linux/releases/17/Everything/$basearch/os
+#repo --name=ifedora-updates --baseurl=http://download.fedoraproject.org/pub/fedora/linux/updates/17/$basearch
+
+#
+#
+# Add all the packages after the base packages
+#
+%packages --nobase
+@core
+system-config-securitylevel-tui
+audit
+pciutils
+bash
+coreutils
+kernel
+
+e2fsprogs
+passwd
+policycoreutils
+chkconfig
+rootfiles
+yum
+vim-minimal
+acpid
+openssh-clients
+openssh-server
+curl
+sudo
+
+#Allow for dhcp access
+dhclient
+iputils
+
+# package to setup cloudy bits for us
+cloud-init
+
+-firstboot
+-biosdevname
+-NetworkManager-glib
+-NetworkManager
+
+%end
+
+# more ec2-ify
+%post --erroronfail
+
+sed -i -e 's/timeout=5/timeout=0/' \
+    -e '/splashimage/d' \
+    /boot/grub/grub.conf
+
+# the firewall rules get saved as .old  without this we end up not being able 
+# ssh in as iptables blocks access
+
+rename -v  .old "" /etc/sysconfig/*old
+
+# setup systemd to boot to the right runlevel
+rm /etc/systemd/system/default.target
+ln -s /lib/systemd/system/multi-user.target /etc/systemd/system/default.target
+
+# create ec2-user
+useradd ec2-user
+echo -e 'ec2-user\tALL=(ALL)\tNOPASSWD: ALL' >> /etc/sudoers
+
+# remove persistant binding for eth0
+sed -i -e "/^HWADDR=/ d" -e "/^UUID=/ d" /etc/sysconfig/network-scripts/ifcfg-eth0
+
+# put a message on the console
+cat << EOF >> /etc/issue
+Please note: By default it is not possible to login at this terminal. The system
+initially configured for SSH access only. Moreover, a single ssh key - the one
+specified at run time could be used to connect to this machine. To access this
+system, please run SSH client, choose correct SSH private key and specify
+username "ec2-user".
+
+The above notice might not be true if the configuration of the system has been
+altered by the administrator of this machine. In later case please consider to
+remove this message from /etc/issue file.
+
+EOF
+
+%end

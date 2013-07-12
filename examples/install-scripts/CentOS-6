@@ -1,0 +1,110 @@
+# CentOS 6 kickstart customized for C2 (CROC Cloud).
+
+lang en_US.UTF-8
+keyboard us
+timezone --utc Europe/Moscow
+auth --useshadow --enablemd5
+selinux --enforcing
+firewall --service=ssh
+network --bootproto=dhcp --device=eth0 --onboot=on
+services --enabled=network,sshd,rsyslog
+
+text
+poweroff
+skipx
+# will lock root in postinstall
+rootpw !!
+
+ignoredisk --only-use=vda
+clearpart --all --drives=vda
+zerombr
+bootloader --location=mbr --driveorder=vda
+
+part /boot --fstype=ext4 --size=500
+part pv.rootdisk --grow --size=1
+volgroup bootvols --pesize=4096 pv.rootdisk
+logvol / --fstype=ext4 --name=root --vgname=bootvols --grow --size=6200 --grow
+logvol swap --name=swap --vgname=bootvols --grow --size=1024 --maxsize=10048
+
+#
+# Repositories
+repo --name="C6-Updates" --baseurl="http://mirror.yandex.ru/centos/6/updates/x86_64/"
+repo --name="EPEL-6" --baseurl="http://mirrors.kernel.org/fedora-epel/6/x86_64/"
+
+#
+#
+# Add all the packages after the base packages
+#
+%packages --nobase
+@core
+system-config-securitylevel-tui
+audit
+pciutils
+bash
+coreutils
+kernel
+
+e2fsprogs
+passwd
+policycoreutils
+chkconfig
+rootfiles
+yum
+vim-minimal
+acpid
+openssh-clients
+openssh-server
+curl
+sudo
+
+#Allow for dhcp access
+dhclient
+iputils
+
+# package to setup cloudy bits for us
+cloud-init
+
+-firstboot
+-biosdevname
+-NetworkManager-glib
+-NetworkManager
+
+%end
+
+# more ec2-ify
+%post --erroronfail
+
+# the firewall rules get saved as .old  without this we end up not being able 
+# ssh in as iptables blocks access
+
+rename -v  .old "" /etc/sysconfig/*old
+
+# create ec2-user
+useradd ec2-user
+echo -e 'ec2-user\tALL=(ALL)\tNOPASSWD: ALL' >> /etc/sudoers
+
+# cloud-init in EPEL6 has debian artifacts. So following debian-to-el6 hack is needed
+sed -ie '/^HOSTNAME=/ d; a HOSTNAME=$(cat /etc/hostname||echo localhost)' /etc/sysconfig/network
+
+# remove persistant binding for eth0
+sed -i -e "/^HWADDR=/ d" -e "/^UUID=/ d" /etc/sysconfig/network-scripts/ifcfg-eth0
+rm -f /etc/udev/rules.d/70-persistent-net.rules
+
+# lock root
+passwd -l root
+
+# put a message on the console
+cat << EOF >> /etc/issue
+Please note: By default it is not possible to login at this terminal. The system
+initially configured for SSH access only. Moreover, a single ssh key - the one
+specified at run time could be used to connect to this machine. To access this
+system, please run SSH client, choose correct SSH private key and specify
+username "ec2-user".
+
+The above notice might not be true if the configuration of the system has been
+altered by the administrator of this machine. In later case please consider to
+remove this message from /etc/issue file.
+
+EOF
+
+%end

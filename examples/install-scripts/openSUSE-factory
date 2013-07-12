@@ -1,0 +1,163 @@
+<?xml version="1.0"?>
+<!DOCTYPE profile>
+<profile xmlns="http://www.suse.com/1.0/yast2ns" xmlns:config="http://www.suse.com/1.0/configns">
+  <general>
+    <mode>
+      <confirm config:type="boolean">false</confirm>
+      <second_stage config:type="boolean">false</second_stage>
+      <final_halt config:type="boolean">true</final_halt>
+      <halt config:type="boolean">true</halt>
+    </mode>
+  </general>
+  <users config:type="list">
+    <user>
+      <encrypted config:type="boolean">true</encrypted>
+      <user_password>!!</user_password>
+      <username>root</username>
+    </user>
+  </users>
+  <partitioning config:type="list">
+    <drive>
+      <device>/dev/vda</device>
+      <initialize config:type="boolean">true</initialize>
+      <partitions config:type="list">
+        <partition>
+          <size>500mb</size>
+          <mount>/boot</mount>
+          <filesystem config:type="symbol">ext3</filesystem>
+        </partition>
+        <partition>
+          <size>max</size>
+          <lvm_group>bootdisks</lvm_group>
+        </partition>
+      </partitions>
+      <use>all</use>
+    </drive>
+    <drive>
+      <device>/dev/bootdisks</device>
+      <is_lvm_vg config:type="boolean">true</is_lvm_vg>
+      <partitions config:type="list">
+        <partition>
+          <size>1gb</size>
+          <mount>swap</mount>
+          <lv_name>swap</lv_name>
+          <filesystem config:type="symbol">swap</filesystem>
+        </partition>
+        <partition>
+          <size>max</size>
+          <mount>/</mount>
+          <lv_name>root</lv_name>
+          <filesystem config:type="symbol">ext4</filesystem>
+        </partition>
+      </partitions>
+      <use>all</use>
+    </drive>
+  </partitioning>
+  <networking>
+    <dns>
+      <dhcp_hostname config:type="boolean">true</dhcp_hostname>
+      <dhcp_resolv config:type="boolean">true</dhcp_resolv>
+      <domain>local</domain>
+      <hostname>unconfigured</hostname>
+    </dns>
+    <interfaces config:type="list">
+      <interface>
+        <device>eth0</device>
+        <bootproto>dhcp</bootproto>
+        <startmode>onboot</startmode>
+      </interface>
+    </interfaces>
+  </networking>
+  <timezone>
+    <hwclock>UTC</hwclock>
+    <timezone>Europe/Moscow</timezone>
+  </timezone>
+  <runlevel>
+    <default>3</default>
+    <services config:type="list">
+      <service>
+        <service_name>sshd</service_name>
+        <service_status>enable</service_status>
+      </service>
+      <service>
+        <service_name>cloud-init</service_name>
+        <service_status>enable</service_status>
+      </service>
+    </services>
+  </runlevel>
+  <software>
+    <kernel>kernel-default</kernel>
+    <packages config:type="list">
+      <package>cloud-init</package>
+      <package>zypper</package>
+      <package>iptables</package>
+      <package>vim</package>
+      <package>less</package>
+      <package>iputils</package>
+      <package>mc</package>
+      <package>psmisc</package>
+    </packages>
+    <do_online_update config:type="boolean">true</do_online_update>
+  </software>
+  <scripts>
+    <chroot-scripts config:type="list">
+      <script>
+        <chrooted config:type="boolean">false</chrooted>
+        <debug config:type="boolean">true</debug>
+        <filename>fix_proc_not_mounted</filename>
+        <notification>Fixing missing mount of /proc in target chroot...</notification>
+        <source>
+          <![CDATA[
+mount -o bind /proc /mnt/proc
+]]>
+</source>
+      </script>
+      <script>
+        <chrooted config:type="boolean">true</chrooted>
+        <debug config:type="boolean">true</debug>
+        <filename>add_issue_note</filename>
+        <source>
+          <![CDATA[
+cat << EOF >> /etc/issue
+Please note: By default it is not possible to login at this terminal. The system
+initially configured for SSH access only. Moreover, a single ssh key - the one
+specified at run time could be used to connect to this machine. To access this
+system, please run SSH client, choose correct SSH private key and specify
+username "root".
+
+The above notice might not be true if the configuration of the system has been
+altered by the administrator of this machine. In later case please consider to
+remove this message from /etc/issue file.
+
+EOF
+]]>
+</source>
+      </script>
+      <script>
+        <chrooted config:type="boolean">true</chrooted>
+        <debug config:type="boolean">true</debug>
+        <filename>fix_cloud_init_conf</filename>
+        <source>
+          <![CDATA[
+sed -i "/^# datasource/ a datasource_list: [\"Ec2\"]" /etc/cloud/cloud.cfg
+]]>
+</source>
+      </script>
+      <script>
+        <chrooted config:type="boolean">true</chrooted>
+        <debug config:type="boolean">true</debug>
+        <filename>fix_services_not_enabled</filename>
+        <notification>Fix services...</notification>
+        <source>
+          <![CDATA[
+systemctl enable cloud-init
+systemctl enable sshd
+chkconfig cloud-init on
+chkconfig sshd on
+rm -rf /var/lib/cloud/*
+]]>
+</source>
+      </script>
+    </chroot-scripts>
+  </scripts>
+</profile>

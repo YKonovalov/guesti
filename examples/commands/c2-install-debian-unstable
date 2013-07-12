@@ -1,0 +1,7 @@
+# use stable installer and unstable breed
+U=http://mirror.yandex.ru/debian/dists/stable/main/installer-amd64/current/images/netboot/debian-installer/amd64
+
+guesti c2 install --ipxe-snapshot-id snap-5B0909A9\
+    --template-name "Debian unstable" \
+    --initrd  $U/initrd.gz \
+    --kernel "$U/linux url=http://storage.cloud.croc.ru/kss/Debian-unstable interface=auto auto=true priority=critical"
