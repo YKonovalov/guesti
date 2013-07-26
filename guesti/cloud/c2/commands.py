@@ -201,10 +201,12 @@ class C2_CLOUD(ABS_CLOUD):
                     sys.exit(exitcode)
                 if instance.state in ["running", "pending"]:
                     if not self.__quiet:
-                        percent_cb(1, 1)
+                        pass
+                        #sys.stdout.write('.')
+                        #sys.stdout.flush()
                 elif instance.state == "stopped":
                     LOG.info("Installation finnished {0} {1} launched at: {2}".format(
-                             instance_id, installer_name, instance.launch_time))
+                             instance_id, self.installer_name, instance.launch_time))
                     install_ok = True
                     break
                 else:
@@ -343,7 +345,7 @@ class C2_CLOUD(ABS_CLOUD):
                     if c2r_file:
                         LOG.debug("Removed temporary object (bucket: {0}, name: {1})".format(self.s3_bucket, snapshot_name))
                     else:
-                        LOG.error("Remove temp object failed (bucket: {0}, name: {1})".format(self.s3_bucket, snapshot_name))
+                        LOG.error("Remove of temp object failed (bucket: {0}, name: {1})".format(self.s3_bucket, snapshot_name))
                         exitcode = 4
                     if snapshot_id and not success:
                         LOG.warning("Snapshot is not complete")

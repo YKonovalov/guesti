@@ -9,12 +9,13 @@ Release:  1%{?dist}
 License:  GPLv3+
 Group:    Applications/System
 
-Requires:       %lib = %version-%release
 Provides:       %name = %version-%release
 
 URL:        https://github.com/ykonovalov/guesti
 BuildRoot:  %_tmppath/%name-%version-root
 BuildArch:  noarch
+BuildRequires:  make, python%pyver
+BuildRequires:  python%pyver-setuptools, python%pyver-sphinx, pytest
 
 Source0: guesti-%version.tar.gz
 
@@ -41,6 +42,7 @@ find %buildroot/ -name '*.egg-info' -exec rm -rf -- '{}' '+'
 %files
 %_bindir/*
 %python_sitearch/guesti
+%_datadir/guesti
 %doc COPYING README.md DESCRIPTION build/sphinx/html
 
 %changelog

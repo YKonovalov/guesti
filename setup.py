@@ -1,13 +1,16 @@
 # -*- coding: utf-8 -*-
 from setuptools import setup
-import sys, os
+import sys, os, glob
 
 here = os.path.abspath(os.path.dirname(__file__))
 DESCRIPTION = open(os.path.join(here, 'DESCRIPTION')).read()
+install_launchers = glob.glob(os.path.join('examples', 'launchers', '*'))
+install_installscripts = glob.glob(os.path.join('examples', 'installer-scripts', '*'))
 
+name = 'guesti'
 version = '0.0.1'
 
-setup(name='guesti',
+setup(name=name,
       version=version,
       description="A cloud machine image build automation tool",
       long_description=DESCRIPTION,
@@ -32,6 +35,9 @@ setup(name='guesti',
       ],
       scripts=[
           'tools/guesti'
+      ] + install_launchers,
+      data_files=[
+          (os.path.join('share', name, 'installer-scripts'), install_installscripts)
       ],
       include_package_data=True,
       install_requires=[
