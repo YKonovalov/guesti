@@ -222,7 +222,4 @@ remove this message from /etc/issue file.
 
 EOF
 
-# Temporary fix (remove later) for https://bugzilla.redhat.com/show_bug.cgi?id=964006
-rpm -Uvh http://arm.koji.fedoraproject.org//packages/selinux-policy/3.12.1/53.fc19/noarch/selinux-policy-3.12.1-53.fc19.noarch.rpm http://arm.koji.fedoraproject.org//packages/selinux-policy/3.12.1/53.fc19/noarch/selinux-policy-targeted-3.12.1-53.fc19.noarch.rpm
-
 %end
