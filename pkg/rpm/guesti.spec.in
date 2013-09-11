@@ -10,6 +10,8 @@ License:  GPLv3+
 Group:    Applications/System
 
 Provides:       %name = %version-%release
+Requires: python-boto
+Requires: python-glanceclient, python-novaclient, python-keystoneclient, python-cinderclient
 
 URL:        https://github.com/ykonovalov/guesti
 BuildRoot:  %_tmppath/%name-%version-root

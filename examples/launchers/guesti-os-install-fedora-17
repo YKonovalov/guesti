@@ -1,0 +1,12 @@
+REL=17
+U=http://download.fedoraproject.org/pub/fedora/linux/releases/$REL/Fedora/x86_64/os
+U=http://mirror.yandex.ru/fedora/linux/releases/$REL/Fedora/x86_64/os
+U=http://archives.fedoraproject.org/pub/archive/fedora/linux/releases/$REL/Fedora/x86_64/os/
+
+guesti os install \
+	--ipxe-image-id 3c0550e3-b0d4-4dbf-8873-aa16692114ad \
+	--install-network-id 08009e80-90bd-4e78-92fe-284e0105af57 \
+	--install-machine 2 \
+    --template-name "Fedora $REL" \
+    --initrd  $U/images/pxeboot/initrd.img \
+    --kernel "$U/images/pxeboot/vmlinuz repo=$U ks=http://storage.cloud.croc.ru/kss/Fedora-$REL"

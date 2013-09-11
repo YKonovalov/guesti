@@ -8,7 +8,7 @@ install_launchers = glob.glob(os.path.join('examples', 'launchers', '*'))
 install_installscripts = glob.glob(os.path.join('examples', 'installer-scripts', '*'))
 
 name = 'guesti'
-version = '0.0.1'
+version = '0.0.2'
 
 setup(name=name,
       version=version,
@@ -31,7 +31,8 @@ setup(name=name,
       packages=[
           'guesti',
           'guesti.cloud',
-          'guesti.cloud.c2'
+          'guesti.cloud.c2',
+          'guesti.cloud.os'
       ],
       scripts=[
           'tools/guesti'
@@ -43,6 +44,10 @@ setup(name=name,
       install_requires=[
           'boto',
           'xml',
-          'urlparse'
+          'urlparse',
+          'glanceclient',
+          'cinderclient',
+          'keystoneclient',
+          'novaclient'
       ]
 )

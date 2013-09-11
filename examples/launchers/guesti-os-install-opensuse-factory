@@ -1,0 +1,11 @@
+U=http://mirror.yandex.ru/opensuse/factory/repo/oss
+# Installer sometimes is not stable in factory.
+B=http://mirror.yandex.ru/opensuse/factory-tested/repo/oss
+
+guesti os install \
+	--ipxe-image-id 3c0550e3-b0d4-4dbf-8873-aa16692114ad \
+	--install-network-id 08009e80-90bd-4e78-92fe-284e0105af57 \
+	--install-machine 2 \
+    --template-name "openSUSE factory" \
+    --initrd  $U/boot/x86_64/loader/initrd \
+    --kernel "$U/boot/x86_64/loader/linux install=$U autoyast=https://raw.github.com/YKonovalov/guesti/master/examples/installer-scripts/openSUSE-factory textmode=1"

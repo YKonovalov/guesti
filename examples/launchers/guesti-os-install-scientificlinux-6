@@ -1,0 +1,9 @@
+U=http://mirror.yandex.ru/scientificlinux/6/x86_64/os
+
+guesti os install \
+	--ipxe-image-id 3c0550e3-b0d4-4dbf-8873-aa16692114ad \
+	--install-network-id 08009e80-90bd-4e78-92fe-284e0105af57 \
+	--install-machine 2 \
+    --template-name "Scientific Linux 6" \
+    --initrd  $U/images/pxeboot/initrd.img \
+    --kernel "$U/images/pxeboot/vmlinuz repo=$U ks=http://storage.cloud.croc.ru/kss/ScientificLinux-6"

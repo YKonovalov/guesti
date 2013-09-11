@@ -13,16 +13,6 @@
 # You should have received a copy of the GNU General Public License
 # along with GuestI.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Contains top level info for cloud control modules."""
+"""Contains top level info for OpenStack cloud control module."""
 
-
-__enabled__ = [
-    "c2",
-    "os"
-]
-
-__disabled__ = [
-    "aws"
-]
-
-__all__ = __enabled__ + __disabled__
+from guesti.cloud.os.commands import *
