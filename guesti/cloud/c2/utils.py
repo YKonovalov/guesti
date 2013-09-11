@@ -24,7 +24,7 @@ from boto.s3.connection import S3Connection
 from boto.exception import S3ResponseError, S3PermissionsError
 from boto.s3.key import Key
 from xml.dom.minidom import parseString
-from xml.dom.ext import PrettyPrint
+#from xml.dom.ext import PrettyPrint
 from StringIO import StringIO
 from time import time
 import base64
@@ -39,7 +39,8 @@ callback_last_out_time = int(time())
 
 def toprettyxml_fixed(node, encoding='utf-8'):
     tmpStream = StringIO()
-    PrettyPrint(node, stream=tmpStream, encoding=encoding)
+    #PrettyPrint(node, stream=tmpStream, encoding=encoding)
+    tmpStream.write(node.toxml(encoding=encoding))
     return tmpStream.getvalue()
 
 
