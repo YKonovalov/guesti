@@ -37,9 +37,12 @@ logvol swap --name=swap --vgname=bootvols --grow --size=1024 --maxsize=10048
 #
 # Repositories
 # add Everything repo for cloud-init and reqs.
-repo --name=ifedora         --baseurl=http://mirror.yandex.ru/fedora/linux/releases/17/Everything/x86_64/os
-repo --name=ifedora-updates --baseurl=http://mirror.yandex.ru/fedora/linux/updates/17/x86_64
+repo --name=ifedora         --baseurl=http://archives.fedoraproject.org/pub/archive/fedora/linux/releases/17/Everything/x86_64/os
+repo --name=ifedora-updates --baseurl=http://archives.fedoraproject.org/pub/archive/fedora/linux/updates/17/x86_64
 
+#repo --name=ifedora         --baseurl=http://mirror.yandex.ru/fedora/linux/releases/17/Everything/x86_64/os
+#repo --name=ifedora-updates --baseurl=http://mirror.yandex.ru/fedora/linux/updates/17/x86_64
+#
 #repo --name=fedora         --baseurl=http://dl.fedoraproject.org/pub/fedora/linux/releases/17/Everything/$basearch/os
 #repo --name=fedora-updates --baseurl=http://dl.fedoraproject.org/pub/fedora/linux/updates/17/$basearch
 #
