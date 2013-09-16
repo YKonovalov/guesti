@@ -55,7 +55,7 @@ def add_args_to_parser(parser):
 
     p_install_instance = p_install.add_argument_group('Installator Instance Parameters', """Installation will be performed in cloud VM instance. Here you can
 adjust VM attributes according to OS installer system requirements.""")
-    p_install_instance.add_argument('--ipxe-snapshot-id', dest='ipxe_snapshot_id', required=True,
+    p_install_instance.add_argument('--ipxe-snapshot-id', action=EnvDefault, envvar='IPXE_SNAPSHOT_ID',
                                     help="""Special cloud ipxe.iso boot image snapshot is required for installers boot to succeed.
 It should be modified to request iPXE script from cloud user-data URL. See more info in README.
 Please specify existing snapshot-id of cloud ipxe image. You can upload and create snapshot with

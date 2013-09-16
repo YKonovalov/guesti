@@ -65,15 +65,15 @@ def add_args_to_parser(parser):
 
     p_install_instance = p_install.add_argument_group('Installator Instance Parameters', """Installation will be performed in cloud VM instance. Here you can
 adjust VM attributes according to OS installer system requirements.""")
-    p_install_instance.add_argument('--ipxe-image-id', dest='ipxe_image_id', required=True,
+    p_install_instance.add_argument('--ipxe-image-id', action=EnvDefault, envvar='IPXE_IMAGE_ID',
                                     help="""Special cloud ipxe.iso boot image snapshot is required for installers boot to succeed.
 It should be modified to request iPXE script from cloud user-data URL. See more info in README.
 Please specify existing snapshot-id of cloud ipxe image. You can upload and create snapshot with
 os-upload-cloud-ipxe tool""")
-    p_install_instance.add_argument('--install-machine', dest='instance_type', default="m1.small",
-                                    help='Type of installation machine (default: m1.small)')
-    p_install_instance.add_argument('--install-network-id', dest='install_network', required=True,
-                                    help='Network to use for installation (default: vlan1319)')
+    p_install_instance.add_argument('--install-flavor-id', action=EnvDefault, envvar='INSTALL_FLAVOR_ID',
+                                    help='Type of installation machine')
+    p_install_instance.add_argument('--install-network-id', action=EnvDefault, envvar='INSTALL_NETWORK_ID',
+                                    help='Network to use for installation')
     p_install_instance.add_argument('--virtualization-type', dest='virt_type', choices=['kvm-virtio', 'kvm-lagacy'], default="kvm-virtio",
                                     help='Specify "kvm-lagacy" for guest with no support for VirtIO (default: kvm-virtio). Will be inherited by result template.')
 
@@ -113,7 +113,7 @@ class OS_CLOUD(ABS_CLOUD):
     installer_image_id = None
     bootdisk_size = None
     virt_type = None
-    instance_type = None
+    install_flavor_id = None
 
     auth_url = None
     tenant = None
@@ -156,12 +156,12 @@ class OS_CLOUD(ABS_CLOUD):
             # Install machine params
             self.installer_name = "Installer of {0}".format(args.template_name)
             self.installer_image_id = args.ipxe_image_id
-            self.install_network = args.install_network
+            self.install_network_id = args.install_network_id
             self.virt_type = args.virt_type
-            self.instance_type = args.instance_type
+            self.install_flavor_id = args.install_flavor_id
             self.glance_url = args.os_image_url
             LOG.debug("installer: {0}, loader: {1}, boot: {2}, virt: {3}, machine: {4}".format(
-                self.installer_name, self.installer_image_id, self.bootdisk_size, self.virt_type, self.instance_type))
+                self.installer_name, self.installer_image_id, self.bootdisk_size, self.virt_type, self.install_flavor_id))
             LOG.debug("cloud: {0}".format(self.auth_url))
 
         LOG.info("Initialized")
@@ -193,9 +193,9 @@ class OS_CLOUD(ABS_CLOUD):
             osc = nova_client.Client('2', username=self.username, api_key=self.password, project_id=self.tenant_name, auth_url=self.auth_url, insecure=True, http_log_debug=True)
             instance = osc.servers.create(name=self.installer_name,
                                             image=self.installer_image_id,
-                                            flavor=self.instance_type,
+                                            flavor=self.install_flavor_id,
                                             userdata=self.__menu,
-                                            nics=[{'net-id': self.install_network}])
+                                            nics=[{'net-id': self.install_network_id}])
             try:
                 instance_id = instance.id
             except KeyError:
