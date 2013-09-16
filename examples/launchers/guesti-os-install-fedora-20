@@ -1,0 +1,10 @@
+REL=20
+B=http://mirror.yandex.ru/fedora/linux/development/$REL/x86_64/os
+#B=http://mirror.yandex.ru/fedora/linux/releases/test/$REL-Beta/Fedora/x86_64/os
+#B=http://mirror.yandex.ru/fedora/linux/releases/$REL/Fedora/x86_64/os
+
+guesti os install \
+    --template-name "Fedora $REL" \
+    --initrd  $B/images/pxeboot/initrd.img \
+    --kernel "$B/images/pxeboot/vmlinuz repo=$B ks=http://storage.cloud.croc.ru/kss/Fedora-$REL"
+#    --kernel "$B/images/pxeboot/vmlinuz repo=$B ks=https://git.fedorahosted.org/cgit/cloud-kickstarts.git/plain/generic/fedora-$REL-cloud.ks"
