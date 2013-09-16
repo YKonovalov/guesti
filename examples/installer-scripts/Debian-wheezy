@@ -30,6 +30,9 @@ d-i clock-setup/utc boolean true
 d-i time/zone string Europe/Moscow
 d-i clock-setup/ntp boolean true
 
+### Remove ISO9660 header to make grub-install happy.
+d-i preseed/early_command string dd if=/dev/zero of=/dev/vda bs=1024k count=1
+
 ### Partitioning
 d-i partman-auto/disk string /dev/vda
 d-i grub-installer/bootdev string /dev/vda
