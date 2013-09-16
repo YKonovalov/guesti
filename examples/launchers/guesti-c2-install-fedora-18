@@ -2,7 +2,7 @@ REL=18
 U=http://download.fedoraproject.org/pub/fedora/linux/releases/$REL/Fedora/x86_64/os
 U=http://mirror.yandex.ru/fedora/linux/releases/$REL/Fedora/x86_64/os
 
-guesti c2 install --ipxe-snapshot-id snap-5B0909A9 \
+guesti c2 install \
     --template-name "Fedora $REL" \
     --initrd  $U/images/pxeboot/initrd.img \
     --kernel "$U/images/pxeboot/vmlinuz repo=$U ks=http://storage.cloud.croc.ru/kss/Fedora-$REL"

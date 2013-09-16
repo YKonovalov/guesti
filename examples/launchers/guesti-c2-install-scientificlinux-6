@@ -1,6 +1,6 @@
 U=http://mirror.yandex.ru/scientificlinux/6/x86_64/os
 
-guesti c2 install --ipxe-snapshot-id snap-5B0909A9\
+guesti c2 install \
     --template-name "Scientific Linux 6" \
     --initrd  $U/images/pxeboot/initrd.img \
     --kernel "$U/images/pxeboot/vmlinuz repo=$U ks=http://storage.cloud.croc.ru/kss/ScientificLinux-6"
