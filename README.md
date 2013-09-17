@@ -18,24 +18,24 @@ Using
 
 After configuring your cloud environment (see below), you can spawn and snapshot an installer instance with:
 
-  U=http://mirror.yandex.ru/scientificlinux/6/x86_64/os
-  guesti {os|c2} install \
-    --template-name "Scientific Linux 6" \
-    --initrd  $U/images/pxeboot/initrd.img \
-    --kernel "$U/images/pxeboot/vmlinuz repo=$U ks=http://storage.cloud.croc.ru/kss/ScientificLinux-6"
+    $ U=http://mirror.yandex.ru/scientificlinux/6/x86_64/os
+    $ guesti {os|c2} install \
+        --template-name "Scientific Linux 6" \
+        --initrd  $U/images/pxeboot/initrd.img \
+        --kernel "$U/images/pxeboot/vmlinuz repo=$U ks=http://storage.cloud.croc.ru/kss/ScientificLinux-6"
 
 There are more examples in the examples/launchers/ directory. You can use them to create machine templates in
 your cloud. For example to create some images in OpenStack run:
 
-  guesti-os-install-centos-6
-  guesti-os-install-debian-7
-  guesti-os-install-debian-unstable
-  guesti-os-install-fedora-17
-  guesti-os-install-fedora-18
-  guesti-os-install-fedora-19
-  guesti-os-install-fedora-20
-  guesti-os-install-opensuse-factory
-  guesti-os-install-scientificlinux-6
+    guesti-os-install-centos-6
+    guesti-os-install-debian-7
+    guesti-os-install-debian-unstable
+    guesti-os-install-fedora-17
+    guesti-os-install-fedora-18
+    guesti-os-install-fedora-19
+    guesti-os-install-fedora-20
+    guesti-os-install-opensuse-factory
+    guesti-os-install-scientificlinux-6
 
 Configuring your cloud environment
 ==================================
@@ -44,12 +44,13 @@ Building custom iPXE image
 --------------------------
 
 In fedora:
-  1. yumdownloader --source ipx
-  2. rpm -i ipxe*.src.rpm
-  3. cp examples/custom-ipxe-build/SOURCES/script0.ipxe ~/rpmbuild/SOURCES/
-  4. (cd ~/rpmbuild/SPEC; patch) < examples/custom-ipxe-build/SPEC/ipxe.spec.patch
-  5. rpmbuild -bs ~/rpmbuild/SPEC/ipxe.spec
-  6. mock ~/rpmbuild/SRPMS/ipxe-*.src.rpm
+
+  1. `yumdownloader --source ipx`
+  2. `rpm -i ipxe*.src.rpm`
+  3. `cp examples/custom-ipxe-build/SOURCES/script0.ipxe ~/rpmbuild/SOURCES/`
+  4. `(cd ~/rpmbuild/SPEC; patch) < examples/custom-ipxe-build/SPEC/ipxe.spec.patch`
+  5. `rpmbuild -bs ~/rpmbuild/SPEC/ipxe.spec`
+  6. `mock ~/rpmbuild/SRPMS/ipxe-*.src.rpm`
   7. Get ipxe.iso from resulting rpm package.
 
 Setting up for Croc Cloud
@@ -97,20 +98,21 @@ Requirements
 Get source
 ----------
 
-  git clone git://github.com/YKonovalov/guesti
-  cd guesti
+    git clone git://github.com/YKonovalov/guesti
+    cd guesti
 
 Build
 -----
+
 You can build and install guesti with setuptools:
 
-  python setup.py install
+    python setup.py install
 
 Or build RPM package:
 
-  make srpm
-  mock {src.rpm file}
-  yum install {noarch.rpm file}
+    make srpm
+    mock {src.rpm file}
+    yum install {noarch.rpm file}
 
 Portability
 -----------
