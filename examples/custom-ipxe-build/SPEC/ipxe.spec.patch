@@ -1,0 +1,28 @@
+--- ipxe.spec--orig	2013-09-05 20:09:35.000000000 +0400
++++ ipxe.spec	2013-09-05 20:09:16.061093985 +0400
+@@ -48,6 +48,7 @@
+ 
+ Source0: %{name}-%{version}-git%{hash}.tar.gz
+ Source1: USAGE
++Source2: script0.ipxe
+ # Remove 2 second startup wait. This patch is not intended to
+ # go upstream. Modifying the general config header file is the
+ # intended means for downstream customization.
+@@ -122,6 +123,7 @@
+ %patch1 -p1
+ %patch2 -p1
+ cp -a %{SOURCE1} .
++cp -a %{SOURCE2} src/
+ 
+ %build
+ %ifarch %{buildarches}
+@@ -140,7 +142,8 @@
+ make bin/undionly.kpxe bin/ipxe.{dsk,iso,usb,lkrn} allroms \
+                    ISOLINUX_BIN=${ISOLINUX_BIN} NO_WERROR=1 V=1 \
+ 		   GITVERSION=%{hash} \
+-		   CROSS_COMPILE=x86_64-linux-gnu-
++		   CROSS_COMPILE=x86_64-linux-gnu- \
++		   EMBED=script0.ipxe
+ 
+ # build roms with efi support for qemu
+ mkdir bin-combined
