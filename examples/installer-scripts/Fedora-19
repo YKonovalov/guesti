@@ -27,7 +27,7 @@ auth --useshadow --enablemd5
 selinux --enforcing
 rootpw --lock
 # Workaround for anaconda asks for local user.
-user --name=ec2-user --gecos="Default Cloud User" --lock
+user --name=fedora --gecos="Fedora Cloud User" --lock
 
 # this is actually not used, but a static firewall
 # matching these rules is generated below.
@@ -202,11 +202,15 @@ fi
 #disable_root: 0
 #EOF
 
+# This is a temporary fix to change the default user to "fedora"; this
+# change will be in an upcoming cloud-init update
+sed -i 's/ec2-user/fedora/;s/EC2 user/Fedora Cloud User/' /etc/cloud/cloud.cfg
+
 echo "Cleaning old yum repodata."
 yum clean all
 
-echo "Zeroing out empty space with fstrim."
-/usr/sbin/fstrim /
+#echo "Zeroing out empty space with fstrim."
+#/usr/sbin/fstrim /
 
 # put a message on the console
 cat << EOF >> /etc/issue
@@ -214,7 +218,7 @@ Please note: By default it is not possible to login at this terminal. The system
 initially configured for SSH access only. Moreover, a single ssh key - the one
 specified at run time could be used to connect to this machine. To access this
 system, please run SSH client, choose correct SSH private key and specify
-username "ec2-user".
+username "fedora".
 
 The above notice might not be true if the configuration of the system has been
 altered by the administrator of this machine. In later case please consider to

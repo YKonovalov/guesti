@@ -105,9 +105,13 @@ rename -v  .old "" /etc/sysconfig/*old
 rm /etc/systemd/system/default.target
 ln -s /lib/systemd/system/multi-user.target /etc/systemd/system/default.target
 
-# create ec2-user
-useradd ec2-user
-echo -e 'ec2-user\tALL=(ALL)\tNOPASSWD: ALL' >> /etc/sudoers
+# create cloud default user
+useradd fedora
+echo -e 'fedora\tALL=(ALL)\tNOPASSWD: ALL' >> /etc/sudoers
+
+# This is a temporary fix to change the default user to "fedora"; this
+# change will be in an upcoming cloud-init update
+sed -i 's/ec2-user/fedora/;s/EC2 user/Fedora Cloud User/' /etc/cloud/cloud.cfg
 
 # remove persistant binding for eth0
 sed -i -e "/^HWADDR=/ d" -e "/^UUID=/ d" /etc/sysconfig/network-scripts/ifcfg-eth0
@@ -118,7 +122,7 @@ Please note: By default it is not possible to login at this terminal. The system
 initially configured for SSH access only. Moreover, a single ssh key - the one
 specified at run time could be used to connect to this machine. To access this
 system, please run SSH client, choose correct SSH private key and specify
-username "ec2-user".
+username "fedora".
 
 The above notice might not be true if the configuration of the system has been
 altered by the administrator of this machine. In later case please consider to

@@ -144,14 +144,18 @@ systemctl mask tmp.mount
 #disable_root: 0
 #EOF
 
+# This is a temporary fix to change the default user to "fedora"; this
+# change will be in an upcoming cloud-init update
+sed -i 's/ec2-user/fedora/;s/EC2 user/Fedora Cloud User/' /etc/cloud/cloud.cfg
+
 echo "Remove persistant binding for eth0"
 sed -i -e "/^HWADDR=/ d" -e "/^UUID=/ d" /etc/sysconfig/network-scripts/ifcfg-eth0
 
-echo "Zeroing out empty space."
+#echo "Zeroing out empty space."
 # This forces the filesystem to reclaim space from deleted files
-dd bs=1M if=/dev/zero of=/var/tmp/zeros || :
-rm -f /var/tmp/zeros
-echo "(Don't worry -- that out-of-space error was expected.)"
+#dd bs=1M if=/dev/zero of=/var/tmp/zeros || :
+#rm -f /var/tmp/zeros
+#echo "(Don't worry -- that out-of-space error was expected.)"
 
 # put a message on the console
 cat << EOF >> /etc/issue
@@ -159,7 +163,7 @@ Please note: By default it is not possible to login at this terminal. The system
 initially configured for SSH access only. Moreover, a single ssh key - the one
 specified at run time could be used to connect to this machine. To access this
 system, please run SSH client, choose correct SSH private key and specify
-username "ec2-user".
+username "fedora".
 
 The above notice might not be true if the configuration of the system has been
 altered by the administrator of this machine. In later case please consider to
