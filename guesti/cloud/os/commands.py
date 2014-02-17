@@ -40,6 +40,8 @@ store credentials to be able to run this tool from cron. You can also
 specify this options using corresponding environment variables.""")
     p_os.add_argument('--os-auth-url', action=EnvDefault, envvar='OS_AUTH_URL',
                       help='URL for keystone API endpoint')
+    p_os.add_argument('--os-region-name', action=EnvDefault, envvar='OS_REGION_NAME',
+                      help='Region name to use for running installator instance')
     p_os.add_argument('--os-tenant-id', action=EnvDefault, envvar='OS_TENANT_ID',
                       help='Project id to use for running installator instance')
     p_os.add_argument('--os-tenant-name', action=EnvDefault, envvar='OS_TENANT_NAME',
@@ -131,6 +133,7 @@ class OS_CLOUD(ABS_CLOUD):
 
         # Cloud endpoints and credentials
         self.auth_url = args.os_auth_url
+        self.region = args.os_region_name
         self.tenant = args.os_tenant_id
         self.tenant_name = args.os_tenant_name
         self.username = args.os_username
@@ -190,7 +193,7 @@ class OS_CLOUD(ABS_CLOUD):
                 exitcode = 1
                 sys.exit(exitcode)
             osi = glance_client.Client("1", endpoint=self.glance_url, token=osk.auth_token)
-            osc = nova_client.Client('2', username=self.username, api_key=self.password, project_id=self.tenant_name, auth_url=self.auth_url, insecure=True, http_log_debug=True)
+            osc = nova_client.Client('2', username=self.username, api_key=self.password, region_name=self.region, project_id=self.tenant_name, auth_url=self.auth_url, insecure=True, http_log_debug=True)
             instance = osc.servers.create(name=self.installer_name,
                                             image=self.installer_image_id,
                                             flavor=self.install_flavor_id,
@@ -249,13 +252,15 @@ class OS_CLOUD(ABS_CLOUD):
             LOG.info("Template {0} is creating. Waiting for image {1} to finnish copying...".format(
                      self.template_name, image_id))
             for i in range(120):
-                image_updated = osi.images.get(image_id)
                 try:
+                    image_updated = osi.images.get(image_id)
                     s = image_updated.status
                 except KeyError:
                     LOG.error("Failed to find template {0}.".format(image_id))
                     exitcode = 7
                     sys.exit(exitcode)
+                else:
+                    pass
                 if s in ["queued","saving"]:
                     LOG.info("Template {0} is copying. Waiting.".format(image_id))
                 elif s == "active":
