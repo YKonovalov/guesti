@@ -1,0 +1,5 @@
+select disk 0
+clean
+select disk 1
+offline disk
+exit

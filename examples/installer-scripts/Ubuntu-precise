@@ -1,15 +1,15 @@
-# Debian 7 wheezy preseed customized for YC2 OpenStack.
+# Ubuntu 12.04 precise preseed customized for YC2 OpenStack.
 
 d-i mirror/manual boolean true
 d-i mirror/country string manual
 d-i mirror/protocol select http
 d-i mirror/http/hostname string mirror.yandex.ru
-d-i mirror/http/directory string /debian
+d-i mirror/http/directory string /ubuntu
 
 # Suite to install.
-d-i mirror/suite string wheezy
+d-i mirror/suite string precise
 # Suite to use for loading installer components (optional).
-d-i mirror/udeb/suite string wheezy
+d-i mirror/udeb/suite string precise
 
 d-i debian-installer/allow_unauthenticated string true
 d-i partman-lvm/device_remove_lvm boolean true
@@ -84,7 +84,10 @@ d-i partman/confirm_nooverwrite boolean true
 d-i passwd/root-login boolean true
 d-i passwd/root-password-crypted string !!
 
-d-i passwd/make-user boolean false
+d-i passwd/make-user boolean true
+d-i passwd/user-fullname string "default cloud user"
+d-i passwd/username string yc2-user
+d-i passwd/user-password-crypted string !!
 
 ## APT
 d-i apt-setup/non-free boolean true
@@ -95,11 +98,11 @@ d-i apt-setup/security_host string
 d-i apt-setup/volatile_host string
 # we need backports to get cloud-init
 #d-i apt-setup/backports boolean true
-d-i apt-setup/local0/repository string http://mirror.yandex.ru/debian/ wheezy-backports main
+d-i apt-setup/local0/repository string http://mirror.yandex.ru/ubuntu/ precise-backports main
 
 tasksel tasksel/first multiselect standard, ssh-server
 
-d-i pkgsel/include string openssh-server cloud-init sudo vim systemd systemd-sysv
+d-i pkgsel/include string openssh-server cloud-init sudo vim
 
 d-i grub-installer/only_debian boolean false
 d-i grub-installer/with_other_os boolean false
@@ -115,8 +118,8 @@ tmpreaper tmpreaper/readsecurity_upgrading note
 d-i preseed/late_command string \
     in-target rm -f /etc/udev/rules.d/70-persistent-net.rules; \
     in-target sed -i '$ a yc2-user ALL=(ALL) NOPASSWD: ALL' /etc/sudoers; \
-    in-target sed -i 's/^\([[:blank:]]\+name:[[:blank:]]\+\)debian$/\1yc2-user/' /etc/cloud/cloud.cfg; \
-    in-target sed -i 's;^\([[:blank:]]\+primary:[[:blank:]]\+\).*$;\1http://mirror.yandex.ru/debian;' /etc/cloud/cloud.cfg; \
+    in-target sed -i 's/^\([[:blank:]]\+name:[[:blank:]]\+\)ubuntu$/\1yc2-user/' /etc/cloud/cloud.cfg; \
+    in-target sed -i 's;^\([[:blank:]]\+primary:[[:blank:]]\+\).*$;\1http://mirror.yandex.ru/ubuntu;' /etc/cloud/cloud.cfg; \
     in-target sed -i 's/^allow-hotplug eth0$/auto eth0/' /etc/network/interfaces; \
     echo "Please note: By default it is not possible to login at this terminal. The system" >>/target/etc/issue ;\
     echo "initially configured for SSH access only. Moreover, a single ssh key - the one"   >>/target/etc/issue ;\

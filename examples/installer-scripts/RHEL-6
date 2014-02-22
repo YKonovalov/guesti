@@ -1,4 +1,4 @@
-# CentOS 6 kickstart customized for YC2 OpenStack.
+# RHEL 6 kickstart customized for YC2 OpenStack.
 
 lang en_US.UTF-8
 keyboard us
@@ -28,7 +28,13 @@ logvol swap --name=swap --vgname=bootvols --grow --size=1024 --maxsize=10048
 
 #
 # Repositories
-repo --name="C6-Updates" --baseurl="http://mirror.yandex.ru/centos/6/updates/x86_64/"
+repo --name="RHEL6 updates" --baseurl="http://rhel.yandex.net/rhel6/rhel-x86_64-server-6/getPackage/"
+repo --name="RHEL6 updates fastrack" --baseurl="http://rhel.yandex.net/rhel6/rhel-x86_64-server-fastrack-6/getPackage/"
+repo --name="RHEL6 optional updates" --baseurl="http://rhel.yandex.net/rhel6/rhel-x86_64-server-optional-6/getPackage/"
+repo --name="RHEL6 optional fastrack updates" --baseurl="http://rhel.yandex.net/rhel6/rhel-x86_64-server-optional-fastrack-6/getPackage/"
+repo --name="RHEL6 supplementary updates" --baseurl="http://rhel.yandex.net/rhel6/rhel-x86_64-server-supplementary-6/getPackage/"
+repo --name="RHEL6 v2vwin updates" --baseurl="http://rhel.yandex.net/rhel6/rhel-x86_64-server-v2vwin-6/getPackage/"
+repo --name="RHEL6 rhn tools updates" --baseurl="http://rhel.yandex.net/rhel6/rhn-tools-rhel-x86_64-server-6/getPackage/"
 repo --name="EPEL-6" --baseurl="http://mirrors.kernel.org/fedora-epel/6/x86_64/"
 
 #
@@ -119,5 +125,17 @@ altered by the administrator of this machine. In later case please consider to
 remove this message from /etc/issue file.
 
 EOF
+
+# Add RHEL repos
+for r in rhel-x86_64-server-6 rhel-x86_64-server-fastrack-6 rhel-x86_64-server-optional-6 rhel-x86_64-server-optional-fastrack-6 rhel-x86_64-server-supplementary-6 rhel-x86_64-server-v2vwin-6 rhn-tools-rhel-x86_64-server-6; do
+cat << EOF >> /etc/yum.repos.d/$r.repo 
+[$r]
+name="Red Hat Enterprise Linux $releasever - $basearch - $r"
+baseurl=http://rhel.yandex.net/rhel6/$r/getPackage/
+enabled=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+EOF
+done
 
 %end

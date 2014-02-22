@@ -1,0 +1,11 @@
+VER=7RU
+K=http://37.9.127.33/windows
+U=$K/$VER
+
+guesti os install \
+    --template-name "Windows $VER" \
+    --initrd  "$U/bootmgr           bootmgr" \
+    --initrd  "$U/boot/bcd          BCD" \
+    --initrd  "$U/boot/boot.sdi     boot.sdi" \
+    --initrd  "$U/sources/boot.wim  boot.wim" \
+    --kernel  "$K/wimboot"

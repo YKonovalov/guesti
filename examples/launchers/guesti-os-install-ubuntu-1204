@@ -1,0 +1,7 @@
+U=http://mirror.yandex.ru/ubuntu/dists/precise/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64
+K=http://37.9.127.33
+
+guesti os install \
+    --template-name "Ubuntu 12.04 precise" \
+    --initrd  $U/initrd.gz \
+    --kernel "$U/linux url=$K/Ubuntu-precise interface=auto auto=true priority=critical"
