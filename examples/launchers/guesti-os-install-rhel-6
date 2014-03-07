@@ -1,5 +1,5 @@
 U=http://rhel.yandex.net/distrib/rhel/rhel6server-x86_64
-K=http://37.9.127.33
+K=$OS_OBJECT_URL/is
 
 guesti os install \
     --template-name "RHEL 6" \

@@ -7,7 +7,7 @@ auth --useshadow --enablemd5
 selinux --enforcing
 firewall --service=ssh
 network --bootproto=dhcp --device=eth0 --onboot=on
-services --enabled=network,sshd,rsyslog
+services --disabled network,wpa_supplicant,ip6tables --enabled=NetworkManager,sshd,cloud-init,rsyslog
 
 text
 poweroff
@@ -30,6 +30,7 @@ logvol swap --name=swap --vgname=bootvols --grow --size=1024 --maxsize=10048
 # Repositories
 repo --name="C6-Updates" --baseurl="http://mirror.yandex.ru/centos/6/updates/x86_64/"
 repo --name="EPEL-6" --baseurl="http://mirrors.kernel.org/fedora-epel/6/x86_64/"
+repo --name="EPEL-6-testing" --baseurl="http://mirrors.kernel.org/fedora-epel/testing/6/x86_64/"
 
 #
 #
@@ -61,14 +62,15 @@ sudo
 dhclient
 iputils
 
+# Dual-stack init is much better with NM
+NetworkManager
+
 # package to setup cloudy bits for us
 cloud-init
 epel-release
 
 -firstboot
 -biosdevname
--NetworkManager-glib
--NetworkManager
 
 %end
 
@@ -80,19 +82,17 @@ epel-release
 
 rename -v  .old "" /etc/sysconfig/*old
 
-# create yc2-user
+echo -n "Create yc2-user"
 useradd yc2-user
 echo -e 'yc2-user\tALL=(ALL)\tNOPASSWD: ALL' >> /etc/sudoers
-sed -i -e "s/^\([[:blank:]]*user:[[:blank:]]*\)ec2-user$/\1yc2-user/" /etc/cloud/cloud.cfg
+sed -i -e "s/^\([[:blank:]]\+name:[[:blank:]]\+\)cloud-user$/\1yc2-user/" /etc/cloud/cloud.cfg
+#sed -i -e "s/^\([[:blank:]]*user:[[:blank:]]*\)ec2-user$/\1yc2-user/" /etc/cloud/cloud.cfg
 
-# cloud-init in EPEL6 has debian artifacts. So following debian-to-el6 hack is needed
-sed -ie '/^HOSTNAME=/ d; a HOSTNAME=$(cat /etc/hostname||echo localhost)' /etc/sysconfig/network
-echo "localhost.localdomain" > /etc/hostname
-
+echo -n "Network fixes"
 # remove persistant binding for eth0
 rm -f /etc/udev/rules.d/70-persistent-net.rules
 
-# simple eth0 config, again not hard-coded to the build hardware
+# enable dhcpv6
 cat > /etc/sysconfig/network-scripts/ifcfg-eth0 << EOF
 DEVICE=eth0
 TYPE=Ethernet
@@ -101,6 +101,12 @@ BOOTPROTO=dhcp
 IPV6INIT=yes
 DHCPV6C=yes
 DHCPV6C_OPTIONS=-nw
+EOF
+
+# cloud-init needs to wait for IP
+cat > /etc/sysconfig/network << EOF
+NETWORKING=yes
+NETWORKWAIT=yes
 EOF
 
 # lock root

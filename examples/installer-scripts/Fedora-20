@@ -1,7 +1,7 @@
 # Fedora 20 kickstart customized for anaconda install.
 #
-# Based on http://git.fedorahosted.org/cgit/cloud-kickstarts.git/tree/generic/fedora-19-x86_64-cloud.ks
-# ------------------------------------------------------------------------
+# Based on https://git.fedorahosted.org/cgit/cloud-kickstarts.git/plain/generic/fedora-20-cloud.ks
+#
 # This is a basic Fedora 20 spin designed to work in OpenStack and other
 # private cloud environments. It's configured with cloud-init so it will
 # take advantage of ec2-compatible metadata services for provisioning ssh
@@ -17,25 +17,23 @@
 
 lang en_US.UTF-8
 keyboard us
-timezone --utc Europe/Moscow
+timezone --utc Etc/UTC
 
 text
 
 auth --useshadow --enablemd5
 selinux --enforcing
-rootpw --lock --iscrypted locked
+rootpw --lock locked
 
 # Workaround for anaconda asks for local user.
-user --name=fedora --gecos="Fedora Cloud User" --lock
+user --name=yc2-user --gecos="Default Cloud User" --lock
 
-# this is actually not used, but a static firewall
-# matching these rules is generated below.
-firewall --service=ssh
+firewall --disabled
 
-bootloader --timeout=1 --append="console=ttyS0,115200n8 console=tty0" extlinux
+bootloader --timeout=1 --append="console=ttyS0,115200n8 console=tty0"
 
 network --bootproto=dhcp --device=eth0 --onboot=on
-services --enabled=network,sshd,rsyslog,iptables,cloud-init,cloud-init-local,cloud-config,cloud-final
+services --disabled network --enabled=NetworkManager,NetworkManager-wait-online,sshd,rsyslog,cloud-init,cloud-init-local,cloud-config,cloud-final
 
 ignoredisk --only-use=vda
 clearpart --all --drives=vda
@@ -49,8 +47,10 @@ logvol / --fstype=ext4 --name=root --vgname=bootvols --grow --size=6200 --grow
 logvol swap --name=swap --vgname=bootvols --grow --size=1024 --maxsize=10048
 
 # Repositories
-repo --name=fedora --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=fedora-20&arch=$basearch
-repo --name=fedora-updates --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=updates-released-f20&arch=$basearch
+#repo --name=fedora --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=fedora-20&arch=$basearch
+#repo --name=fedora-updates --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=updates-released-f20&arch=$basearch
+repo --name=everything     --baseurl=http://mirror.yandex.ru/fedora/linux/releases/20/Everything/x86_64/os
+repo --name=fedora-updates --baseurl=http://mirror.yandex.ru/fedora/linux/updates/20/x86_64
 
 
 
@@ -66,6 +66,9 @@ kernel
 # a user account with ssh keys.
 cloud-init
 
+# this is used by openstack's cloud orchestration framework (and it's small)
+heat-cfntools
+
 # need this for growpart, because parted doesn't yet support resizepart
 # https://bugzilla.redhat.com/show_bug.cgi?id=966993
 cloud-utils-growpart
@@ -74,25 +77,20 @@ cloud-utils-growpart
 dracut-config-generic
 -dracut-config-rescue
 
-# Not needed with pv-grub (as in EC2), and pulled in automatically
-# by anaconda, but appliance-creator needs the hint
-syslinux-extlinux 
-
 # Needed initially, but removed below.
 firewalld
-
-# Basic firewall. If you're going to rely on your cloud service's
-# security groups you can remove this.
-iptables-services
 
 # cherry-pick a few things from @standard
 tar
 rsync
 
+# Dual-stack init is much better in NM
+NetworkManager
+NetworkManager-config-server
+
 # Some things from @core we can do without in a minimal install
 -biosdevname
 -plymouth
--NetworkManager
 -iprutils
 -kbd
 
@@ -101,35 +99,6 @@ rsync
 
 
 %post --erroronfail
-
-# Create grub.conf for EC2.
-if [[ ! -e /boot/grub/grub.conf ]]; then
-  echo -n "Creating grub.conf for pvgrub"
-  rootuuid=$( awk '$2=="/" { print $1 };'  /etc/fstab )
-  mkdir /boot/grub
-  echo -e 'default=0\ntimeout=0\n\n' > /boot/grub/grub.conf
-  for kv in $( ls -1v /boot/vmlinuz* |grep -v rescue |sed s/.*vmlinuz-//  ); do
-    echo "title Fedora ($kv)" >> /boot/grub/grub.conf
-    echo -e "\troot (hd0)" >> /boot/grub/grub.conf
-    echo -e "\tkernel /boot/vmlinuz-$kv ro root=$rootuuid console=hvc0 LANG=en_US.UTF-8" >> /boot/grub/grub.conf
-    echo -e "\tinitrd /boot/initramfs-$kv.img" >> /boot/grub/grub.conf
-    echo
-  done
-fi
-
-
-#link grub.conf to menu.lst for ec2 to work
-echo -n "Linking menu.lst to old-style grub.conf for pv-grub"
-ln -sf grub.conf /boot/grub/menu.lst
-ln -sf /boot/grub/grub.conf /etc/grub.conf
-
-# older versions of livecd-tools do not follow "rootpw --lock" line above
-# https://bugzilla.redhat.com/show_bug.cgi?id=964299
-passwd -l root
-
-# Kickstart specifies timeout in seconds; syslinux uses 10ths.
-# 0 means wait forever, so instead we'll go with 1.
-sed -i 's/^timeout 10/timeout 1/' /boot/extlinux/extlinux.conf
 
 # setup systemd to boot to the right runlevel
 echo -n "Setting default runlevel to multiuser text mode"
@@ -150,28 +119,6 @@ yum -C -y remove linux-firmware
 # be present for install/image building.
 echo "Removing firewalld."
 yum -C -y remove firewalld --setopt="clean_requirements_on_remove=1"
-
-# Non-firewalld-firewall
-echo -n "Writing static firewall"
-cat <<EOF > /etc/sysconfig/iptables
-# Simple static firewall loaded by iptables.service. Replace
-# this with your own custom rules, run lokkit, or switch to 
-# shorewall or firewalld as your needs dictate.
-*filter
-:INPUT ACCEPT [0:0]
-:FORWARD ACCEPT [0:0]
-:OUTPUT ACCEPT [0:0]
--A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
--A INPUT -p icmp -j ACCEPT
--A INPUT -i lo -j ACCEPT
--A INPUT -m conntrack --ctstate NEW -m tcp -p tcp --dport 22 -j ACCEPT
-#-A INPUT -m conntrack --ctstate NEW -m tcp -p tcp --dport 80 -j ACCEPT
-#-A INPUT -m conntrack --ctstate NEW -m tcp -p tcp --dport 443 -j ACCEPT
--A INPUT -j REJECT --reject-with icmp-host-prohibited
--A FORWARD -j REJECT --reject-with icmp-host-prohibited
-COMMIT
-EOF
-echo .
 
 # Another one needed at install time but not after that, and it pulls
 # in some unneeded deps (like, newt and slang)
@@ -199,10 +146,13 @@ ln -s /dev/null /etc/udev/rules.d/80-net-name-slot.rules
 
 # simple eth0 config, again not hard-coded to the build hardware
 cat > /etc/sysconfig/network-scripts/ifcfg-eth0 << EOF
-DEVICE="eth0"
-BOOTPROTO="dhcp"
-ONBOOT="yes"
-TYPE="Ethernet"
+DEVICE=eth0
+TYPE=Ethernet
+ONBOOT=yes
+BOOTPROTO=dhcp
+IPV6INIT=yes
+DHCPV6C=yes
+DHCPV6C_OPTIONS=-nw
 EOF
 
 # generic localhost names
@@ -236,11 +186,6 @@ fi
 # make sure firstboot doesn't start
 echo "RUN_FIRSTBOOT=NO" > /etc/sysconfig/firstboot
 
-# workaround https://bugzilla.redhat.com/show_bug.cgi?id=966888
-if ! grep -q growpart /etc/cloud/cloud.cfg; then
-  sed -i 's/ - resizefs/ - growpart\n - resizefs/' /etc/cloud/cloud.cfg
-fi
-
 # Uncomment this if you want to use cloud init but suppress the creation
 # of an "ec2-user" account. This will, in the absence of further config,
 # cause the ssh key from a metadata source to be put in the root account.
@@ -249,25 +194,19 @@ fi
 #disable_root: 0
 #EOF
 
-# This is a temporary fix to change the default user to "fedora"; this
-# change will be in an upcoming cloud-init update
-sed -i 's/ec2-user/fedora/;s/EC2 user/Fedora Cloud User/' /etc/cloud/cloud.cfg
+# Better use yc2-user for all images
+sed -i -e "s/^\([[:blank:]]\+name:[[:blank:]]\+\)fedora$/\1yc2-user/" /etc/cloud/cloud.cfg
 
 echo "Removing random-seed so it's not the same in every image."
 rm -f /var/lib/random-seed
 
 echo "Cleaning old yum repodata."
+yum history new
 yum clean all
 truncate -c -s 0 /var/log/yum.log
 
 echo "Fixing SELinux contexts."
 /usr/sbin/fixfiles -R -a restore
-
-echo "Zeroing out empty space."
-# This forces the filesystem to reclaim space from deleted files
-#dd bs=1M if=/dev/zero of=/var/tmp/zeros || :
-#rm -f /var/tmp/zeros
-#echo "(Don't worry -- that out-of-space error was expected.)"
 
 # put a message on the console
 cat << EOF >> /etc/issue
@@ -275,7 +214,7 @@ Please note: By default it is not possible to login at this terminal. The system
 initially configured for SSH access only. Moreover, a single ssh key - the one
 specified at run time could be used to connect to this machine. To access this
 system, please run SSH client, choose correct SSH private key and specify
-username "fedora".
+username "yc2-user".
 
 The above notice might not be true if the configuration of the system has been
 altered by the administrator of this machine. In later case please consider to
@@ -284,4 +223,3 @@ remove this message from /etc/issue file.
 EOF
 
 %end
-

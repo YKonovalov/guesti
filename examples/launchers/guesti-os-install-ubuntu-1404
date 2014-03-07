@@ -1,0 +1,7 @@
+U=http://mirror.yandex.ru/ubuntu/dists/trusty/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64
+K=$OS_OBJECT_URL/is
+
+guesti os install \
+    --template-name "Ubuntu 14.04 trusty" \
+    --initrd  $U/initrd.gz \
+    --kernel "$U/linux url=$K/Ubuntu-trusty interface=auto auto=true priority=critical"

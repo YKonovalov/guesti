@@ -1,5 +1,5 @@
 U=http://mirror.yandex.ru/ubuntu/dists/precise/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64
-K=http://37.9.127.33
+K=$OS_OBJECT_URL/is
 
 guesti os install \
     --template-name "Ubuntu 12.04 precise" \

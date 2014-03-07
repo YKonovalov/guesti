@@ -1,6 +1,7 @@
 U=http://mirror.yandex.ru/debian/dists/wheezy/main/installer-amd64/current/images/netboot/debian-installer/amd64
+K=http://37.9.127.33
 
 guesti os install \
     --template-name "Debian 7 wheezy" \
     --initrd  $U/initrd.gz \
-    --kernel "$U/linux url=http://storage.cloud.croc.ru/kss/Debian-wheezy interface=auto auto=true priority=critical"
+    --kernel "$U/linux url=$K/Debian-wheezy interface=auto auto=true priority=critical"

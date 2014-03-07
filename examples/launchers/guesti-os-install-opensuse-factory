@@ -1,8 +1,9 @@
-U=http://213.180.204.183/opensuse/factory/repo/oss
+U=http://mirror.yandex.ru/opensuse/factory/repo/oss
 # Installer sometimes is not stable in factory.
-U=http://mirror.yandex.ru/opensuse/factory-tested/repo/oss
+#U=http://mirror.yandex.ru/opensuse/factory-tested/repo/oss
+K=http://37.9.127.33
 
 guesti os install \
     --template-name "openSUSE factory" \
     --initrd  $U/boot/x86_64/loader/initrd \
-    --kernel "$U/boot/x86_64/loader/linux install=$U autoyast=https://raw.github.com/YKonovalov/guesti/master/examples/installer-scripts/openSUSE-factory textmode=1"
+    --kernel "$U/boot/x86_64/loader/linux install=$U autoyast=$K/openSUSE-factory textmode=1"

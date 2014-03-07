@@ -1,4 +1,4 @@
-# Ubuntu 12.04 precise preseed customized for YC2 OpenStack.
+# Ubuntu 14.04 trusty preseed customized for YC2 OpenStack.
 
 d-i mirror/manual boolean true
 d-i mirror/country string manual
@@ -7,9 +7,9 @@ d-i mirror/http/hostname string mirror.yandex.ru
 d-i mirror/http/directory string /ubuntu
 
 # Suite to install.
-d-i mirror/suite string precise
+d-i mirror/suite string trusty
 # Suite to use for loading installer components (optional).
-d-i mirror/udeb/suite string precise
+d-i mirror/udeb/suite string trusty
 
 d-i debian-installer/allow_unauthenticated string true
 d-i partman-lvm/device_remove_lvm boolean true
@@ -93,15 +93,14 @@ d-i passwd/user-password-crypted string !!
 ## APT
 d-i apt-setup/security_host mirror.yandex.ru
 d-i apt-setup/volatile_host string
- 
+
 d-i apt-setup/non-free boolean true
 d-i apt-setup/contrib boolean false
 d-i apt-setup/use_mirror boolean false
- 
+
 d-i apt-setup/universe boolean true
 d-i apt-setup/backports boolean true
 d-i apt-setup/services-select multiselect
-#d-i apt-setup/local0/repository string http://dist.yandex.ru/common stable all amd64
 
 tasksel tasksel/first multiselect standard, ssh-server
 
@@ -123,8 +122,10 @@ tmpreaper tmpreaper/readsecurity_upgrading note
 d-i preseed/late_command string \
     in-target rm -f /etc/udev/rules.d/70-persistent-net.rules; \
     in-target sed -i '$ a yc2-user ALL=(ALL) NOPASSWD: ALL' /etc/sudoers; \
-    in-target sed  's/^\([[:blank:]]*\(name\|user\):[[:blank:]]\+\)ubuntu$/\1yc2-user/' /etc/cloud/cloud.cfg; \
+    in-target sed -i 's/^\([[:blank:]]\+name:[[:blank:]]\+\)ubuntu$/\1yc2-user/' /etc/cloud/cloud.cfg; \
     in-target sed -i 's;^\([[:blank:]]\+primary:[[:blank:]]\+\).*$;\1http://mirror.yandex.ru/ubuntu;' /etc/cloud/cloud.cfg; \
+    in-target sed -i 's;^\([[:blank:]]\+security:[[:blank:]]\+\)http://security.*$;\1http://mirror.yandex.ru/ubuntu;' /etc/cloud/cloud.cfg; \
+    in-target sed -i '/^[[:blank:]-]\+http:\/\/%(ec2_region)s.*/ d' /etc/cloud/cloud.cfg; \
     in-target sed -i 's;^\([[:blank:]-]\+\)http:.*$;\1http://mirror.yandex.ru/ubuntu/;' /etc/cloud/cloud.cfg; \
     printf "auto lo\niface lo inet loopback\n\nauto eth0\niface eth0 inet dhcp\niface eth0 inet6 dhcp\n up /sbin/ip -6 route add default via fe80::1 dev \$IFACE\n" > /etc/network/interfaces; \
     echo "Please note: By default it is not possible to login at this terminal. The system" >>/target/etc/issue ;\

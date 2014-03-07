@@ -1,4 +1,4 @@
-# Scientific Linux 6 kickstart customized for C2 (CROC Cloud).
+# Scientific Linux 6 kickstart customized for YC2 OpenStack.
 
 lang en_US.UTF-8
 keyboard us
@@ -18,7 +18,7 @@ rootpw !!
 ignoredisk --only-use=vda
 clearpart --all --drives=vda
 zerombr
-bootloader --location=mbr --driveorder=vda
+bootloader --location=mbr --driveorder=vda --append="console=ttyS0,115200n8 console=tty0"
 
 part /boot --fstype=ext4 --size=500
 part pv.rootdisk --grow --size=1
@@ -63,6 +63,7 @@ iputils
 
 # package to setup cloudy bits for us
 cloud-init
+epel-release
 
 -firstboot
 -biosdevname
@@ -79,16 +80,27 @@ cloud-init
 
 rename -v  .old "" /etc/sysconfig/*old
 
-# create ec2-user
-useradd ec2-user
-echo -e 'ec2-user\tALL=(ALL)\tNOPASSWD: ALL' >> /etc/sudoers
+# create yc2-user
+useradd yc2-user
+echo -e 'yc2-user\tALL=(ALL)\tNOPASSWD: ALL' >> /etc/sudoers
+sed -i -e "s/^\([[:blank:]]*user:[[:blank:]]*\)ec2-user$/\1yc2-user/" /etc/cloud/cloud.cfg
 
 # cloud-init in EPEL6 has debian artifacts. So following debian-to-el6 hack is needed
 sed -ie '/^HOSTNAME=/ d; a HOSTNAME=$(cat /etc/hostname||echo localhost)' /etc/sysconfig/network
+echo "localhost.localdomain" > /etc/hostname
 
 # remove persistant binding for eth0
-sed -i -e "/^HWADDR=/ d" -e "/^UUID=/ d" /etc/sysconfig/network-scripts/ifcfg-eth0
 rm -f /etc/udev/rules.d/70-persistent-net.rules
+
+cat > /etc/sysconfig/network-scripts/ifcfg-eth0 << EOF
+DEVICE=eth0
+TYPE=Ethernet
+ONBOOT=yes
+BOOTPROTO=dhcp
+IPV6INIT=yes
+DHCPV6C=yes
+DHCPV6C_OPTIONS=-nw
+EOF
 
 # lock root
 passwd -l root
@@ -99,7 +111,7 @@ Please note: By default it is not possible to login at this terminal. The system
 initially configured for SSH access only. Moreover, a single ssh key - the one
 specified at run time could be used to connect to this machine. To access this
 system, please run SSH client, choose correct SSH private key and specify
-username "ec2-user".
+username "yc2-user".
 
 The above notice might not be true if the configuration of the system has been
 altered by the administrator of this machine. In later case please consider to
