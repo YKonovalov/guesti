@@ -1,4 +1,4 @@
-# Ubuntu 14.04 trusty preseed customized for YC2 OpenStack.
+# Ubuntu 14.04 trusty preseed customized for OpenStack.
 
 d-i mirror/manual boolean true
 d-i mirror/country string manual
@@ -36,7 +36,6 @@ d-i preseed/early_command string dd if=/dev/zero of=/dev/vda bs=1024k count=1
 
 ### Partitioning
 d-i partman-auto/disk string /dev/vda
-d-i grub-installer/bootdev string /dev/vda
 d-i partman-auto/method string lvm
 
 # remove old lvm and md
@@ -87,7 +86,7 @@ d-i passwd/root-password-crypted string !!
 
 d-i passwd/make-user boolean true
 d-i passwd/user-fullname string "default cloud user"
-d-i passwd/username string yc2-user
+d-i passwd/username string cloud-user
 d-i passwd/user-password-crypted string !!
 
 ## APT
@@ -104,10 +103,19 @@ d-i apt-setup/services-select multiselect
 
 tasksel tasksel/first multiselect standard, ssh-server
 
-d-i pkgsel/include string openssh-server cloud-init sudo vim
+d-i pkgsel/include string linux-virtual openssh-server \
+    cloud-init cloud-initramfs-growroot cloud-initramfs-rescuevol \
+    vim mc byobu screen tmux w3m \
+    sudo bc curl \
+    acpid fonts-ubuntu-font-family-console
+d-i pkgsel/exclude wireless-tools wpasupplicant iw
 
+### Bootloader
+d-i grub-installer/bootdev string /dev/vda
 d-i grub-installer/only_debian boolean false
 d-i grub-installer/with_other_os boolean false
+d-i base-installer/kernel/image string linux-image-virtual
+d-i grub-installer/timeout string 1
 d-i debian-installer/quiet boolean false
 d-i debian-installer/splash boolean false
 d-i debian-installer/add-kernel-opts string console=ttyS0,115200n8 console=tty0
@@ -121,20 +129,25 @@ tmpreaper tmpreaper/readsecurity_upgrading note
 # Clear network iface mapping; force network to wait for dhcp before cloud-init
 d-i preseed/late_command string \
     in-target rm -f /etc/udev/rules.d/70-persistent-net.rules; \
-    in-target sed -i '$ a yc2-user ALL=(ALL) NOPASSWD: ALL' /etc/sudoers; \
-    in-target sed -i 's/^\([[:blank:]]\+name:[[:blank:]]\+\)ubuntu$/\1yc2-user/' /etc/cloud/cloud.cfg; \
+    in-target sed -i '$ a cloud-user ALL=(ALL) NOPASSWD: ALL' /etc/sudoers; \
+    in-target sed -i 's/^\([[:blank:]]\+name:[[:blank:]]\+\)ubuntu$/\1cloud-user/' /etc/cloud/cloud.cfg; \
     in-target sed -i 's;^\([[:blank:]]\+primary:[[:blank:]]\+\).*$;\1http://mirror.yandex.ru/ubuntu;' /etc/cloud/cloud.cfg; \
     in-target sed -i 's;^\([[:blank:]]\+security:[[:blank:]]\+\)http://security.*$;\1http://mirror.yandex.ru/ubuntu;' /etc/cloud/cloud.cfg; \
     in-target sed -i '/^[[:blank:]-]\+http:\/\/%(ec2_region)s.*/ d' /etc/cloud/cloud.cfg; \
     in-target sed -i 's;^\([[:blank:]-]\+\)http:.*$;\1http://mirror.yandex.ru/ubuntu/;' /etc/cloud/cloud.cfg; \
-    printf "auto lo\niface lo inet loopback\n\nauto eth0\niface eth0 inet dhcp\niface eth0 inet6 dhcp\n up /sbin/ip -6 route add default via fe80::1 dev \$IFACE\n" > /etc/network/interfaces; \
+    printf "auto lo\niface lo inet loopback\n\n" > /etc/network/interfaces; \
+    printf "auto eth0\niface eth0 inet dhcp\n"   >> /etc/network/interfaces; \
+    printf "iface eth0 inet6 auto\n privext 0\n" >> /etc/network/interfaces; \
+    printf "iface eth0 inet6 dhcp\n accept_ra 1\n autoconf 1\n" >> /etc/network/interfaces; \
     echo "Please note: By default it is not possible to login at this terminal. The system" >>/target/etc/issue ;\
     echo "initially configured for SSH access only. Moreover, a single ssh key - the one"   >>/target/etc/issue ;\
     echo "specified at run time could be used to connect to this machine. To access this"   >>/target/etc/issue ;\
     echo "system, please run SSH client, choose correct SSH private key and specify"        >>/target/etc/issue ;\
-    echo "username \"yc2-user\"."                                                           >>/target/etc/issue ;\
+    echo "username \"cloud-user\"."                                                         >>/target/etc/issue ;\
     echo                                                                                    >>/target/etc/issue ;\
     echo "The above notice might not be true if the configuration of the system has been"   >>/target/etc/issue ;\
     echo "altered by the administrator of this machine. In later case please consider to"   >>/target/etc/issue ;\
     echo "remove this message from /etc/issue file."                                        >>/target/etc/issue ;\
-    echo                                                                                    >>/target/etc/issue
+    echo                                                                                    >>/target/etc/issue ;\
+    dd bs=1M if=/dev/zero of=/target/var/tmp/zeros || : ;\
+    rm -f /target/var/tmp/zeros

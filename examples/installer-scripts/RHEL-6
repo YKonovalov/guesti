@@ -1,4 +1,4 @@
-# RHEL 6 kickstart customized for YC2 OpenStack.
+# RHEL 6 kickstart customized for OpenStack.
 
 lang en_US.UTF-8
 keyboard us
@@ -88,11 +88,11 @@ epel-release
 
 rename -v  .old "" /etc/sysconfig/*old
 
-echo -n "Create yc2-user"
-useradd yc2-user
-echo -e 'yc2-user\tALL=(ALL)\tNOPASSWD: ALL' >> /etc/sudoers
-sed -i -e "s/^\([[:blank:]]\+name:[[:blank:]]\+\)cloud-user$/\1yc2-user/" /etc/cloud/cloud.cfg
-#sed -i -e "s/^\([[:blank:]]*user:[[:blank:]]*\)ec2-user$/\1yc2-user/" /etc/cloud/cloud.cfg
+echo -n "Create cloud-user"
+useradd cloud-user
+echo -e 'cloud-user\tALL=(ALL)\tNOPASSWD: ALL' >> /etc/sudoers
+sed -i -e "s/^\([[:blank:]]\+name:[[:blank:]]\+\)cloud-user$/\1cloud-user/" /etc/cloud/cloud.cfg
+#sed -i -e "s/^\([[:blank:]]*user:[[:blank:]]*\)ec2-user$/\1cloud-user/" /etc/cloud/cloud.cfg
 
 echo -n "Network fixes"
 # remove persistant binding for eth0
@@ -124,7 +124,7 @@ Please note: By default it is not possible to login at this terminal. The system
 initially configured for SSH access only. Moreover, a single ssh key - the one
 specified at run time could be used to connect to this machine. To access this
 system, please run SSH client, choose correct SSH private key and specify
-username "yc2-user".
+username "cloud-user".
 
 The above notice might not be true if the configuration of the system has been
 altered by the administrator of this machine. In later case please consider to

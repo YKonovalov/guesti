@@ -26,7 +26,7 @@ selinux --enforcing
 rootpw --lock locked
 
 # Workaround for anaconda asks for local user.
-user --name=yc2-user --gecos="Default Cloud User" --lock
+user --name=cloud-user --gecos="Default Cloud User" --lock
 
 firewall --disabled
 
@@ -194,8 +194,8 @@ echo "RUN_FIRSTBOOT=NO" > /etc/sysconfig/firstboot
 #disable_root: 0
 #EOF
 
-# Better use yc2-user for all images
-sed -i -e "s/^\([[:blank:]]\+name:[[:blank:]]\+\)fedora$/\1yc2-user/" /etc/cloud/cloud.cfg
+# Better use cloud-user for all images
+sed -i -e "s/^\([[:blank:]]\+name:[[:blank:]]\+\)fedora$/\1cloud-user/" /etc/cloud/cloud.cfg
 
 echo "Removing random-seed so it's not the same in every image."
 rm -f /var/lib/random-seed
@@ -214,12 +214,18 @@ Please note: By default it is not possible to login at this terminal. The system
 initially configured for SSH access only. Moreover, a single ssh key - the one
 specified at run time could be used to connect to this machine. To access this
 system, please run SSH client, choose correct SSH private key and specify
-username "yc2-user".
+username "cloud-user".
 
 The above notice might not be true if the configuration of the system has been
 altered by the administrator of this machine. In later case please consider to
 remove this message from /etc/issue file.
 
 EOF
+
+echo "Zeroing out empty space."
+# This forces the filesystem to reclaim space from deleted files
+dd bs=1M if=/dev/zero of=/var/tmp/zeros || :
+rm -f /var/tmp/zeros
+echo "(Don't worry -- that out-of-space error was expected.)"
 
 %end
