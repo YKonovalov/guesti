@@ -40,7 +40,7 @@ store credentials to be able to run this tool from cron. You can also
 specify this options using corresponding environment variables.""")
     p_os.add_argument('--os-auth-url', action=EnvDefault, envvar='OS_AUTH_URL',
                       help='URL for keystone API endpoint')
-    p_os.add_argument('--os-region-name', action=EnvDefault, envvar='OS_REGION_NAME', default=None,
+    p_os.add_argument('--os-region-name', action=EnvDefault, envvar='OS_REGION_NAME', required=False,
                       help='Region name to use for running installator instance')
     p_os.add_argument('--os-tenant-id', action=EnvDefault, envvar='OS_TENANT_ID',
                       help='Project id to use for running installator instance')
