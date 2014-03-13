@@ -109,7 +109,7 @@ d-i pkgsel/include string linux-server openssh-server \
     ec2-init \
     vim mc screen w3m \
     sudo bc curl \
-    acpid
+    acpid wide-dhcpv6-client
 d-i pkgsel/exclude wireless-tools wpasupplicant
 
 ### Bootloader
@@ -132,10 +132,10 @@ tmpreaper tmpreaper/readsecurity_upgrading note
 d-i preseed/late_command string \
     in-target rm -f /etc/udev/rules.d/70-persistent-net.rules; \
     in-target sed -i '$ a cloud-user ALL=(ALL) NOPASSWD: ALL' /etc/sudoers; \
-    in-target sed -i 's/^\([[:blank:]]*\(name\|user\):[[:blank:]]\+\)ubuntu$/\1cloud-user/' /etc/cloud/cloud.cfg; \
-    in-target sed -i 's;^\([[:blank:]]\+primary:[[:blank:]]\+\).*$;\1http://old-releases.ubuntu.com/ubuntu;' /etc/cloud/cloud.cfg; \
-    in-target sed -i 's;^\([[:blank:]]\+security:[[:blank:]]\+\)http://security.*$;\1http://old-releases.ubuntu.com/ubuntu;' /etc/cloud/cloud.cfg; \
-    in-target sed -i 's;^\([[:blank:]-]\+\)http:.*$;\1http://old-releases.ubuntu.com/ubuntu/;' /etc/cloud/cloud.cfg; \
+    in-target sed -i 's/^\([[:blank:]]*\(name\|user\):[[:blank:]]\+\)ubuntu$/\1cloud-user/' /etc/ec2-init/ec2-config.cfg; \
+    in-target touch /etc/ec2-init/is-compat-env; \
+    in-target sed -i '$ a compat=1' /etc/ec2-init/is-compat-env; \
+    in-target mv /etc/ec2-init/templates/sources.list.tmpl /etc/ec2-init/templates/sources.list.tmpl--disabled; \
     printf "auto lo\niface lo inet loopback\n\n" > /target/etc/network/interfaces; \
     printf "auto eth0\niface eth0 inet dhcp\n"   >> /target/etc/network/interfaces; \
     printf " pre-down dhclient -6 -r -pf /run/dhclient6.\$IFACE.pid -lf /var/lib/dhcp/dhclient6.\$IFACE.leases \$IFACE\n" >> /target/etc/network/interfaces; \
