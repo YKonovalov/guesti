@@ -1,0 +1,11 @@
+VER=08.04
+NAME=hardy
+ARCH=amd64
+
+U=http://old-releases.ubuntu.com/ubuntu/dists/$NAME/main/installer-$ARCH/current/images/netboot/ubuntu-installer/$ARCH
+K=$OS_OBJECT_URL/is
+
+guesti os install \
+    --template-name "Ubuntu $VER $NAME" \
+    --initrd  $U/initrd.gz \
+    --kernel "$U/linux url=$K/Ubuntu-$NAME interface=auto auto=true priority=critical console-setup/layoutcode=us"

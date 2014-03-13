@@ -1,0 +1,155 @@
+# Ubuntu 08.04 hardy preseed customized for OpenStack.
+
+d-i mirror/manual boolean true
+d-i mirror/country string manual
+d-i mirror/protocol select http
+d-i mirror/http/hostname string old-releases.ubuntu.com
+d-i mirror/http/directory string /ubuntu
+
+# Suite to install.
+d-i mirror/suite string hardy
+# Suite to use for loading installer components (optional).
+d-i mirror/udeb/suite string hardy
+
+d-i debian-installer/allow_unauthenticated string true
+d-i partman-lvm/device_remove_lvm boolean true
+
+d-i debian-installer/locale string en_US
+
+d-i netcfg/choose_interface select auto
+d-i netcfg/dhcp_timeout string 60
+d-i netcfg/dhcp_failed note
+d-i netcfg/dhcp_options select Configure network manually
+d-i netcfg/get_hostname string cloudguest
+d-i netcfg/wireless_wep string
+d-i netcfg/target_network_config ifupdown
+
+d-i clock-setup/utc boolean true
+d-i time/zone string Europe/Moscow
+d-i clock-setup/ntp boolean true
+
+### Remove ISO9660 header to make grub-install happy.
+d-i preseed/early_command string dd if=/dev/zero of=/dev/vda bs=1024k count=1
+
+### Partitioning
+d-i partman-auto/disk string /dev/vda
+d-i partman-auto/method string lvm
+
+# remove old lvm and md
+d-i partman-lvm/device_remove_lvm boolean true
+d-i partman-md/device_remove_md boolean true
+
+# confirm changes
+d-i partman-lvm/confirm boolean true
+d-i partman-lvm/confirm_nooverwrite boolean true
+
+# scheme - all files in one fs
+d-i partman-auto/choose_recipe select atomic
+d-i partman-auto-lvm/new_vg_name string bootdisks
+d-i partman-auto/expert_recipe string \
+        boot-root:: \
+                100 500 500 ext3 \
+                        $primary{ } \
+                        $bootable{ } \
+                        method{ format } \
+                        format{ } \
+                        use_filesystem{ } \
+                        filesystem{ ext3 } \
+                        mountpoint{ /boot } \
+                . \
+                6200 1000 1000000000 ext3 \
+                        $lvmok{ } \
+                        #in_vg{ bootdisks } \
+                        lv_name{ root } \
+                        method{ format } format{ } \
+                        use-filesystem{ } filesystem{ ext3 } \
+                        mountpoint{ / } \
+                . \
+                1024 512 1024 linux-swap \
+                        $lvmok{ } \
+                        #in_vg{ bootdisks } \
+                        lv_name{ swap } \
+                        method{ swap } format{ } \
+                .
+
+d-i partman-partitioning/confirm_write_new_label boolean true
+d-i partman/choose_partition select finish
+d-i partman/confirm boolean true
+d-i partman/confirm_nooverwrite boolean true
+
+## Users
+d-i passwd/root-login boolean true
+d-i passwd/root-password-crypted string !!
+
+d-i passwd/make-user boolean true
+d-i passwd/user-fullname string "default cloud user"
+d-i passwd/username string cloud-user
+d-i passwd/user-password-crypted string !!
+
+## APT
+d-i apt-setup/security_host old-releases.ubuntu.com
+d-i apt-setup/volatile_host string
+
+d-i apt-setup/non-free boolean true
+d-i apt-setup/contrib boolean false
+d-i apt-setup/use_mirror boolean false
+
+d-i apt-setup/universe boolean true
+d-i apt-setup/multiverse boolean true
+d-i apt-setup/backports boolean true
+d-i apt-setup/services-select multiselect
+
+d-i apt-setup/local0/repository string http://ppa.launchpad.net/ubuntu-on-ec2/ppa/ubuntu hardy main
+d-i apt-setup/local0/key string http://keyserver.ubuntu.com:11371/pks/lookup?search=0x0926ed02b2142b5c692f424ee048451d9ee6d873&op=get
+d-i apt-setup/local0/comment string Ubuntu on EC2
+
+tasksel tasksel/first multiselect standard, ssh-server
+
+d-i pkgsel/include string linux-server openssh-server \
+    ec2-init \
+    vim mc screen w3m \
+    sudo bc curl \
+    acpid
+d-i pkgsel/exclude wireless-tools wpasupplicant
+
+### Bootloader
+d-i grub-installer/bootdev string /dev/vda
+d-i grub-installer/only_debian boolean false
+d-i grub-installer/with_other_os boolean false
+d-i base-installer/kernel/image string linux-image-server
+d-i grub-installer/timeout string 1
+d-i debian-installer/quiet boolean false
+d-i debian-installer/splash boolean false
+d-i debian-installer/add-kernel-opts string console=ttyS0,115200n8 console=tty0
+
+d-i debian-installer/exit/halt boolean true
+d-i finish-install/reboot_in_progress note
+
+tmpreaper tmpreaper/readsecurity note
+tmpreaper tmpreaper/readsecurity_upgrading note
+
+# Clear network iface mapping; force network to wait for dhcp before ec2-init
+d-i preseed/late_command string \
+    in-target rm -f /etc/udev/rules.d/70-persistent-net.rules; \
+    in-target sed -i '$ a cloud-user ALL=(ALL) NOPASSWD: ALL' /etc/sudoers; \
+    in-target sed -i 's/^\([[:blank:]]*\(name\|user\):[[:blank:]]\+\)ubuntu$/\1cloud-user/' /etc/cloud/cloud.cfg; \
+    in-target sed -i 's;^\([[:blank:]]\+primary:[[:blank:]]\+\).*$;\1http://old-releases.ubuntu.com/ubuntu;' /etc/cloud/cloud.cfg; \
+    in-target sed -i 's;^\([[:blank:]]\+security:[[:blank:]]\+\)http://security.*$;\1http://old-releases.ubuntu.com/ubuntu;' /etc/cloud/cloud.cfg; \
+    in-target sed -i 's;^\([[:blank:]-]\+\)http:.*$;\1http://old-releases.ubuntu.com/ubuntu/;' /etc/cloud/cloud.cfg; \
+    printf "auto lo\niface lo inet loopback\n\n" > /target/etc/network/interfaces; \
+    printf "auto eth0\niface eth0 inet dhcp\n"   >> /target/etc/network/interfaces; \
+    printf " pre-down dhclient -6 -r -pf /run/dhclient6.\$IFACE.pid -lf /var/lib/dhcp/dhclient6.\$IFACE.leases \$IFACE\n" >> /target/etc/network/interfaces; \
+    printf " down ip -6 route del default\n"     >> /target/etc/network/interfaces; \
+    printf "iface eth0 inet6 auto\n privext 0\n" >> /target/etc/network/interfaces; \
+    printf " up dhclient -6 -pf /run/dhclient6.\$IFACE.pid -lf /var/lib/dhcp/dhclient6.\$IFACE.leases \$IFACE\n" >> /target/etc/network/interfaces; \
+    echo "Please note: By default it is not possible to login at this terminal. The system" >>/target/etc/issue ;\
+    echo "initially configured for SSH access only. Moreover, a single ssh key - the one"   >>/target/etc/issue ;\
+    echo "specified at run time could be used to connect to this machine. To access this"   >>/target/etc/issue ;\
+    echo "system, please run SSH client, choose correct SSH private key and specify"        >>/target/etc/issue ;\
+    echo "username \"cloud-user\"."                                                         >>/target/etc/issue ;\
+    echo                                                                                    >>/target/etc/issue ;\
+    echo "The above notice might not be true if the configuration of the system has been"   >>/target/etc/issue ;\
+    echo "altered by the administrator of this machine. In later case please consider to"   >>/target/etc/issue ;\
+    echo "remove this message from /etc/issue file."                                        >>/target/etc/issue ;\
+    echo                                                                                    >>/target/etc/issue ;\
+    sed -i 's/halt/poweroff/g' /lib/debian-installer/exit
