@@ -106,7 +106,7 @@ tasksel tasksel/first multiselect standard, ssh-server
 d-i pkgsel/include string linux-virtual openssh-server \
     cloud-init cloud-initramfs-growroot cloud-initramfs-rescuevol \
     vim mc byobu screen tmux w3m \
-    sudo bc curl \
+    sudo bc curl ndisc6 \
     acpid fonts-ubuntu-font-family-console
 d-i pkgsel/exclude wireless-tools wpasupplicant iw
 
@@ -139,6 +139,7 @@ d-i preseed/late_command string \
     printf "auto eth0\niface eth0 inet dhcp\n"   >> /etc/network/interfaces; \
     printf "iface eth0 inet6 auto\n privext 0\n" >> /etc/network/interfaces; \
     printf "iface eth0 inet6 dhcp\n accept_ra 1\n autoconf 1\n" >> /etc/network/interfaces; \
+    printf " pre-up rdisc6 -1 \$IFACE|grep '^Stateful address conf.\s*:\s*Yes\$'\n" >> /etc/network/interfaces; \
     echo "Please note: By default it is not possible to login at this terminal. The system" >>/target/etc/issue ;\
     echo "initially configured for SSH access only. Moreover, a single ssh key - the one"   >>/target/etc/issue ;\
     echo "specified at run time could be used to connect to this machine. To access this"   >>/target/etc/issue ;\

@@ -107,7 +107,7 @@ tasksel tasksel/first multiselect standard, ssh-server
 d-i pkgsel/include string linux-virtual openssh-server \
     cloud-init cloud-initramfs-growroot cloud-initramfs-rescuevol \
     vim mc byobu screen tmux w3m \
-    sudo bc curl \
+    sudo bc curl ndisc6 \
     acpid fonts-ubuntu-font-family-console
 d-i pkgsel/exclude wireless-tools wpasupplicant iw
 
@@ -137,10 +137,11 @@ d-i preseed/late_command string \
     in-target sed -i 's;^\([[:blank:]-]\+\)http:.*$;\1http://mirror.yandex.ru/ubuntu/;' /etc/cloud/cloud.cfg; \
     printf "auto lo\niface lo inet loopback\n\n" > /target/etc/network/interfaces; \
     printf "auto eth0\niface eth0 inet dhcp\n"   >> /target/etc/network/interfaces; \
-    printf " pre-down dhclient -6 -r -pf /run/dhclient6.\$IFACE.pid -lf /var/lib/dhcp/dhclient6.\$IFACE.leases \$IFACE\n" >> /target/etc/network/interfaces; \
-    printf " down ip -6 route del default\n"     >> /target/etc/network/interfaces; \
     printf "iface eth0 inet6 auto\n privext 0\n" >> /target/etc/network/interfaces; \
+    printf "iface eth0 inet6 manual\n"           >> /target/etc/network/interfaces; \
+    printf " pre-up rdisc6 -1 \$IFACE|grep '^Stateful address conf.\s*:\s*Yes\$'\n" >> /target/etc/network/interfaces; \
     printf " up dhclient -6 -pf /run/dhclient6.\$IFACE.pid -lf /var/lib/dhcp/dhclient6.\$IFACE.leases \$IFACE\n" >> /target/etc/network/interfaces; \
+    printf " down dhclient -6 -r -pf /run/dhclient6.\$IFACE.pid -lf /var/lib/dhcp/dhclient6.\$IFACE.leases \$IFACE\n" >> /target/etc/network/interfaces; \
     echo "Please note: By default it is not possible to login at this terminal. The system" >>/target/etc/issue ;\
     echo "initially configured for SSH access only. Moreover, a single ssh key - the one"   >>/target/etc/issue ;\
     echo "specified at run time could be used to connect to this machine. To access this"   >>/target/etc/issue ;\
@@ -150,4 +151,6 @@ d-i preseed/late_command string \
     echo "The above notice might not be true if the configuration of the system has been"   >>/target/etc/issue ;\
     echo "altered by the administrator of this machine. In later case please consider to"   >>/target/etc/issue ;\
     echo "remove this message from /etc/issue file."                                        >>/target/etc/issue ;\
-    echo                                                                                    >>/target/etc/issue
+    echo                                                                                    >>/target/etc/issue ;\
+    dd bs=1M if=/dev/zero of=/target/var/tmp/zeros || : ;\
+    rm -f /target/var/tmp/zeros
