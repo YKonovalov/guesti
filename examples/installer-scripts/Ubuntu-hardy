@@ -109,7 +109,7 @@ d-i pkgsel/include string linux-server openssh-server \
     ec2-init \
     vim mc screen w3m \
     sudo bc curl \
-    acpid wide-dhcpv6-client
+    acpid wide-dhcpv6-client ndisc6
 d-i pkgsel/exclude wireless-tools wpasupplicant
 
 ### Bootloader
@@ -131,17 +131,16 @@ tmpreaper tmpreaper/readsecurity_upgrading note
 # Clear network iface mapping; force network to wait for dhcp before ec2-init
 d-i preseed/late_command string \
     in-target rm -f /etc/udev/rules.d/70-persistent-net.rules; \
+    in-target sed -i 's/^\(kernel.*\)[[:blank:]]\+quiet\(.*\)$/\1\2/g' /boot/grub/menu.lst; \
+    in-target sed -i 's/^\(kernel.*\)[[:blank:]]\+splash\(.*\)$/\1\2/g' /boot/grub/menu.lst; \
     in-target sed -i '$ a cloud-user ALL=(ALL) NOPASSWD: ALL' /etc/sudoers; \
-    in-target sed -i 's/^\([[:blank:]]*\(name\|user\):[[:blank:]]\+\)ubuntu$/\1cloud-user/' /etc/ec2-init/ec2-config.cfg; \
-    in-target touch /etc/ec2-init/is-compat-env; \
-    in-target sed -i '$ a compat=1' /etc/ec2-init/is-compat-env; \
+    in-target sed -i "s/^\(.*Please login as the \)ubuntu\( user.*\)$/\1' + user + '\2/" /usr/bin/ec2-fetch-credentials; \
     in-target mv /etc/ec2-init/templates/sources.list.tmpl /etc/ec2-init/templates/sources.list.tmpl--disabled; \
-    printf "auto lo\niface lo inet loopback\n\n" > /target/etc/network/interfaces; \
-    printf "auto eth0\niface eth0 inet dhcp\n"   >> /target/etc/network/interfaces; \
-    printf " pre-down dhclient -6 -r -pf /run/dhclient6.\$IFACE.pid -lf /var/lib/dhcp/dhclient6.\$IFACE.leases \$IFACE\n" >> /target/etc/network/interfaces; \
-    printf " down ip -6 route del default\n"     >> /target/etc/network/interfaces; \
-    printf "iface eth0 inet6 auto\n privext 0\n" >> /target/etc/network/interfaces; \
-    printf " up dhclient -6 -pf /run/dhclient6.\$IFACE.pid -lf /var/lib/dhcp/dhclient6.\$IFACE.leases \$IFACE\n" >> /target/etc/network/interfaces; \
+    in-target sed -i 's/ubuntu/cloud-user/' /etc/ec2-init/ec2-config.cfg; \
+    printf "compat=1\n" > /target/etc/ec2-init/is-compat-env; \
+    printf "id-assoc na 0 { };\ninterface eth0\n{\n"                                   >/target/etc/wide-dhcpv6/dhcp6c.conf; \
+    printf "  send ia-na 0;\n  request domain-name-servers;\n"                        >>/target/etc/wide-dhcpv6/dhcp6c.conf; \
+    printf "  request domain-name;\n  script \"/etc/wide-dhcpv6/dhcp6c-script\";\n};\n" >>/target/etc/wide-dhcpv6/dhcp6c.conf; \
     echo "Please note: By default it is not possible to login at this terminal. The system" >>/target/etc/issue ;\
     echo "initially configured for SSH access only. Moreover, a single ssh key - the one"   >>/target/etc/issue ;\
     echo "specified at run time could be used to connect to this machine. To access this"   >>/target/etc/issue ;\
@@ -153,3 +152,5 @@ d-i preseed/late_command string \
     echo "remove this message from /etc/issue file."                                        >>/target/etc/issue ;\
     echo                                                                                    >>/target/etc/issue ;\
     sed -i 's/halt/poweroff/g' /lib/debian-installer/exit
+    dd bs=1M if=/dev/zero of=/target/var/tmp/zeros || : ;\
+    rm -f /target/var/tmp/zeros
