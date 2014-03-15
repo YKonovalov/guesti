@@ -33,18 +33,14 @@ firewall --disabled
 bootloader --timeout=1 --append="console=ttyS0,115200n8 console=tty0"
 
 network --bootproto=dhcp --device=eth0 --onboot=on
-services --disabled network --enabled=NetworkManager,NetworkManager-wait-online,sshd,rsyslog,cloud-init,cloud-init-local,cloud-config,cloud-final
+services --disabled network --enabled=NetworkManager,NetworkManager-wait-online,sshd,rsyslog,ntpate,ntp,cloud-init,cloud-init-local,cloud-config,cloud-final
 
 ignoredisk --only-use=vda
 clearpart --all --drives=vda
 zerombr
 bootloader --location=mbr --driveorder=vda
 
-part /boot --fstype=ext4 --size=500
-part pv.rootdisk --grow --size=1
-volgroup bootvols --pesize=4096 pv.rootdisk
-logvol / --fstype=ext4 --name=root --vgname=bootvols --grow --size=6200 --grow
-logvol swap --name=swap --vgname=bootvols --grow --size=1024 --maxsize=10048
+part / --asprimary --fstype="ext4" --size=999 --label=root --grow
 
 # Repositories
 #repo --name=fedora --mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=fedora-20&arch=$basearch
@@ -83,6 +79,9 @@ firewalld
 # cherry-pick a few things from @standard
 tar
 rsync
+ntp
+
+mc
 
 # Dual-stack init is much better in NM
 NetworkManager

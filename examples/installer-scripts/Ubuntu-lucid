@@ -1,4 +1,4 @@
-# Ubuntu 14.04 trusty preseed customized for OpenStack.
+# Ubuntu 10.04 lucid preseed customized for OpenStack.
 
 d-i mirror/manual boolean true
 d-i mirror/country string manual
@@ -7,9 +7,9 @@ d-i mirror/http/hostname string mirror.yandex.ru
 d-i mirror/http/directory string /ubuntu
 
 # Suite to install.
-d-i mirror/suite string trusty
+d-i mirror/suite string lucid
 # Suite to use for loading installer components (optional).
-d-i mirror/udeb/suite string trusty
+d-i mirror/udeb/suite string lucid
 
 d-i debian-installer/allow_unauthenticated string true
 d-i partman-lvm/device_remove_lvm boolean true
@@ -68,14 +68,15 @@ d-i apt-setup/use_mirror boolean false
 d-i apt-setup/universe boolean true
 d-i apt-setup/backports boolean true
 d-i apt-setup/services-select multiselect
+#d-i apt-setup/local0/repository string http://dist.yandex.ru/common stable all amd64
 
 tasksel tasksel/first multiselect standard, ssh-server
 
 d-i pkgsel/include string linux-virtual openssh-server \
-    cloud-init cloud-initramfs-growroot cloud-initramfs-rescuevol \
+    cloud-init \
     vim mc byobu screen tmux w3m \
     sudo bc curl ndisc6 \
-    acpid fonts-ubuntu-font-family-console
+    acpid wide-dhcpv6-client
 d-i pkgsel/exclude wireless-tools wpasupplicant iw
 
 ### Bootloader
@@ -97,17 +98,15 @@ tmpreaper tmpreaper/readsecurity_upgrading note
 # Clear network iface mapping; force network to wait for dhcp before cloud-init
 d-i preseed/late_command string \
     in-target rm -f /etc/udev/rules.d/70-persistent-net.rules; \
+    in-target sed -i 's/^\(kernel.*\)[[:blank:]]\+quiet\(.*\)$/\1\2/g' /boot/grub/menu.lst; \
+    in-target sed -i 's/^\(kernel.*\)[[:blank:]]\+splash\(.*\)$/\1\2/g' /boot/grub/menu.lst; \
     in-target sed -i '$ a cloud-user ALL=(ALL) NOPASSWD: ALL' /etc/sudoers; \
-    in-target sed -i 's/^\([[:blank:]]\+name:[[:blank:]]\+\)ubuntu$/\1cloud-user/' /etc/cloud/cloud.cfg; \
-    in-target sed -i 's;^\([[:blank:]]\+primary:[[:blank:]]\+\).*$;\1http://mirror.yandex.ru/ubuntu;' /etc/cloud/cloud.cfg; \
-    in-target sed -i 's;^\([[:blank:]]\+security:[[:blank:]]\+\)http://security.*$;\1http://mirror.yandex.ru/ubuntu;' /etc/cloud/cloud.cfg; \
-    in-target sed -i '/^[[:blank:]-]\+http:\/\/%(ec2_region)s.*/ d' /etc/cloud/cloud.cfg; \
-    in-target sed -i 's;^\([[:blank:]-]\+\)http:.*$;\1http://mirror.yandex.ru/ubuntu/;' /etc/cloud/cloud.cfg; \
-    printf "auto lo\niface lo inet loopback\n\n" > /etc/network/interfaces; \
-    printf "auto eth0\niface eth0 inet dhcp\n"   >> /etc/network/interfaces; \
-    printf "iface eth0 inet6 auto\n privext 0\n" >> /etc/network/interfaces; \
-    printf "iface eth0 inet6 dhcp\n accept_ra 1\n autoconf 1\n" >> /etc/network/interfaces; \
-    printf " pre-up rdisc6 -1 \$IFACE|grep '^Stateful address conf.\s*:\s*Yes\$'\n" >> /etc/network/interfaces; \
+    in-target sed -i 's/^\([[:blank:]]*user:[[:blank:]]\+\)ubuntu$/\1cloud-user/' /etc/cloud/cloud.cfg; \
+    in-target mv /etc/cloud/templates/sources.list.tmpl /etc/cloud/templates/sources.list.tmpl--disabled; \
+    in-target mv /etc/cloud/templates/hosts.tmpl /etc/cloud/templates/hosts.tmpl--disabled; \
+    printf "id-assoc na 0 { };\ninterface eth0\n{\n"                                   >/target/etc/wide-dhcpv6/dhcp6c.conf; \
+    printf "  send ia-na 0;\n  request domain-name-servers;\n"                        >>/target/etc/wide-dhcpv6/dhcp6c.conf; \
+    printf "  request domain-name;\n  script \"/etc/wide-dhcpv6/dhcp6c-script\";\n};\n" >>/target/etc/wide-dhcpv6/dhcp6c.conf; \
     echo "Please note: By default it is not possible to login at this terminal. The system" >>/target/etc/issue ;\
     echo "initially configured for SSH access only. Moreover, a single ssh key - the one"   >>/target/etc/issue ;\
     echo "specified at run time could be used to connect to this machine. To access this"   >>/target/etc/issue ;\
@@ -118,5 +117,7 @@ d-i preseed/late_command string \
     echo "altered by the administrator of this machine. In later case please consider to"   >>/target/etc/issue ;\
     echo "remove this message from /etc/issue file."                                        >>/target/etc/issue ;\
     echo                                                                                    >>/target/etc/issue ;\
+    in-target curl http://bazaar.launchpad.net/~cloud-utils-dev/cloud-utils/trunk/download/head:/growpart-20110225134600-d84xgz6209r194ob-1/growpart -o /usr/bin/growpart; \
+    in-target chmod 755 /usr/bin/growpart; \
     dd bs=1M if=/dev/zero of=/target/var/tmp/zeros || : ;\
     rm -f /target/var/tmp/zeros

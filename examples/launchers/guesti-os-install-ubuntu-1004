@@ -1,0 +1,8 @@
+U=http://mirror.yandex.ru/ubuntu/dists/lucid/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64
+K=http://37.9.127.33
+K=$OS_OBJECT_URL/is
+
+guesti os install \
+    --template-name "Ubuntu 10.04 lucid" \
+    --initrd  $U/initrd.gz \
+    --kernel "$U/linux url=$K/Ubuntu-lucid interface=auto auto=true priority=critical"

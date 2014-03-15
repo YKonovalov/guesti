@@ -33,49 +33,17 @@ d-i preseed/early_command string dd if=/dev/zero of=/dev/vda bs=1024k count=1
 
 ### Partitioning
 d-i partman-auto/disk string /dev/vda
-d-i partman-auto/method string lvm
-
-# remove old lvm and md
-d-i partman-lvm/device_remove_lvm boolean true
-d-i partman-md/device_remove_md boolean true
-
-# confirm changes
-d-i partman-lvm/confirm boolean true
-d-i partman-lvm/confirm_nooverwrite boolean true
-
-# scheme - all files in one fs
-d-i partman-auto/choose_recipe select atomic
-d-i partman-auto-lvm/new_vg_name string bootdisks
-d-i partman-auto/expert_recipe string \
-        boot-root:: \
-                100 500 500 ext3 \
-                        $primary{ } \
-                        $bootable{ } \
-                        method{ format } \
-                        format{ } \
-                        use_filesystem{ } \
-                        filesystem{ ext3 } \
-                        mountpoint{ /boot } \
-                . \
-                6200 1000 1000000000 ext3 \
-                        $lvmok{ } \
-                        #in_vg{ bootdisks } \
-                        lv_name{ root } \
-                        method{ format } format{ } \
-                        use-filesystem{ } filesystem{ ext3 } \
-                        mountpoint{ / } \
-                . \
-                1024 512 1024 linux-swap \
-                        $lvmok{ } \
-                        #in_vg{ bootdisks } \
-                        lv_name{ swap } \
-                        method{ swap } format{ } \
-                .
-
+d-i partman-auto/method string regular
+d-i partman-auto/expert_recipe string root :: \
+ 999  1000 -1 ext3 label{ root } $primary{ } $bootable{ } \
+    method{ format } format{ } use_filesystem{ } filesystem{ ext3 } \
+    mountpoint{ / } .
+d-i partman-auto/choose_recipe select root
 d-i partman-partitioning/confirm_write_new_label boolean true
 d-i partman/choose_partition select finish
 d-i partman/confirm boolean true
 d-i partman/confirm_nooverwrite boolean true
+d-i partman-basicfilesystems/no_swap boolean false
 
 ## Users
 d-i passwd/root-login boolean true
