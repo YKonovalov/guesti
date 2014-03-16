@@ -1,12 +1,8 @@
 REL=20
-B=http://mirror.yandex.ru/fedora/linux/development/$REL/x86_64/os
-B=http://mirror.yandex.ru/fedora/linux/releases/test/$REL-Beta/Fedora/x86_64/os
 B=http://mirror.yandex.ru/fedora/linux/releases/$REL/Fedora/x86_64/os
-#OS_OBJECT_URL=http://object.i.haze.yandex-team.ru/v1/AUTH_f13c80ed5d7741439a1234a25bf6534f/is
-#KS=http://37.9.127.33
-KS=$OS_OBJECT_URL/is
+S=$OS_OBJECT_URL/is
 
 guesti os install \
     --template-name "Fedora $REL" \
     --initrd  $B/images/pxeboot/initrd.img \
-    --kernel "$B/images/pxeboot/vmlinuz repo=$B ks=$KS/Fedora-$REL"
+    --kernel "$B/images/pxeboot/vmlinuz repo=$B ks=$S/Fedora-$REL"

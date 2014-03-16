@@ -75,7 +75,7 @@ tasksel tasksel/first multiselect standard, ssh-server
 
 d-i pkgsel/include string linux-server openssh-server \
     ec2-init \
-    vim mc screen w3m \
+    vim mc screen w3m ncurses-term \
     sudo bc curl \
     acpid wide-dhcpv6-client ndisc6
 d-i pkgsel/exclude wireless-tools wpasupplicant
@@ -109,6 +109,7 @@ d-i preseed/late_command string \
     printf "id-assoc na 0 { };\ninterface eth0\n{\n"                                   >/target/etc/wide-dhcpv6/dhcp6c.conf; \
     printf "  send ia-na 0;\n  request domain-name-servers;\n"                        >>/target/etc/wide-dhcpv6/dhcp6c.conf; \
     printf "  request domain-name;\n  script \"/etc/wide-dhcpv6/dhcp6c-script\";\n};\n" >>/target/etc/wide-dhcpv6/dhcp6c.conf; \
+    sed -i 's/halt/poweroff/g' /lib/debian-installer/exit ;\
     echo "Please note: By default it is not possible to login at this terminal. The system" >>/target/etc/issue ;\
     echo "initially configured for SSH access only. Moreover, a single ssh key - the one"   >>/target/etc/issue ;\
     echo "specified at run time could be used to connect to this machine. To access this"   >>/target/etc/issue ;\
@@ -119,6 +120,15 @@ d-i preseed/late_command string \
     echo "altered by the administrator of this machine. In later case please consider to"   >>/target/etc/issue ;\
     echo "remove this message from /etc/issue file."                                        >>/target/etc/issue ;\
     echo                                                                                    >>/target/etc/issue ;\
-    sed -i 's/halt/poweroff/g' /lib/debian-installer/exit
+    in-target curl http://bazaar.launchpad.net/~cloud-utils-dev/cloud-utils/trunk/download/head:/growpart-20110225134600-d84xgz6209r194ob-1/growpart -o /usr/bin/growpart; \
+    in-target sed -i "s/\[ \(.*\) -gt \(.*mbr_max_512.*\) \]/echo \1 \2\|awk '{if(\$1<\$2)exit 1\}'/" /usr/bin/growpart; \
+    in-target chmod 755 /usr/bin/growpart; \
+    in-target curl http://bazaar.launchpad.net/~cloud-initramfs-tools/cloud-initramfs-tools/trunk/download/head:/growroot-20110228195634-hyxy7n1nt4n6pq7r-22/growroot -o /etc/initramfs-tools/hooks/growroot; \
+    in-target curl http://bazaar.launchpad.net/~cloud-initramfs-tools/cloud-initramfs-tools/trunk/download/head:/growroot-20110228195634-hyxy7n1nt4n6pq7r-35/growroot -o /etc/initramfs-tools/scripts/local-bottom/growroot; \
+    in-target sed -i "s:^\(.*\$(growpart.*2>\)\&1\().*\)$:\1/dev/null\2:" /etc/initramfs-tools/scripts/local-bottom/growroot ;\
+    in-target sed -i "s/^FSTYPE=/#FSTYPE=/" /etc/initramfs-tools/scripts/local-bottom/growroot ;\
+    in-target chmod 755 /etc/initramfs-tools/hooks/growroot /etc/initramfs-tools/scripts/local-bottom/growroot ;\
+    in-target sed -i '/^exit 0/ i resize2fs /dev/vda1' /etc/rc.local ;\
+    in-target update-initramfs -u ;\
     dd bs=1M if=/dev/zero of=/target/var/tmp/zeros || : ;\
     rm -f /target/var/tmp/zeros

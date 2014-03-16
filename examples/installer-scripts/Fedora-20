@@ -33,7 +33,7 @@ firewall --disabled
 bootloader --timeout=1 --append="console=ttyS0,115200n8 console=tty0"
 
 network --bootproto=dhcp --device=eth0 --onboot=on
-services --disabled network --enabled=NetworkManager,NetworkManager-wait-online,sshd,rsyslog,ntpate,ntp,cloud-init,cloud-init-local,cloud-config,cloud-final
+services --disabled network --enabled=NetworkManager,NetworkManager-wait-online,sshd,rsyslog,ntpate,ntpd,cloud-init,cloud-init-local,cloud-config,cloud-final
 
 ignoredisk --only-use=vda
 clearpart --all --drives=vda

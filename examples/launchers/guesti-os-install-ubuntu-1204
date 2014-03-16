@@ -1,7 +1,17 @@
-U=http://mirror.yandex.ru/ubuntu/dists/precise/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64
-K=$OS_OBJECT_URL/is
+VER=12.04
+NAME=precise
+ARCHES="amd64 i386"
 
-guesti os install \
-    --template-name "Ubuntu 12.04 precise" \
-    --initrd  $U/initrd.gz \
-    --kernel "$U/linux url=$K/Ubuntu-precise interface=auto auto=true priority=critical"
+S=$OS_OBJECT_URL/is
+
+for ARCH in $ARCHES; do
+    U=http://mirror.yandex.ru/ubuntu/dists/$NAME/main/installer-$ARCH/current/images/netboot/ubuntu-installer/$ARCH
+    A=
+    if [ "$ARCH" != "amd64" ]; then
+     A=" $ARCH"
+    fi
+    guesti os install \
+     --template-name "Ubuntu $VER $NAME$A" \
+     --initrd  $U/initrd.gz \
+     --kernel "$U/linux url=$S/Ubuntu-$NAME interface=auto auto=true priority=critical"
+done

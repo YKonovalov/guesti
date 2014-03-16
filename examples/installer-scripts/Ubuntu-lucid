@@ -98,8 +98,7 @@ tmpreaper tmpreaper/readsecurity_upgrading note
 # Clear network iface mapping; force network to wait for dhcp before cloud-init
 d-i preseed/late_command string \
     in-target rm -f /etc/udev/rules.d/70-persistent-net.rules; \
-    in-target sed -i 's/^\(kernel.*\)[[:blank:]]\+quiet\(.*\)$/\1\2/g' /boot/grub/menu.lst; \
-    in-target sed -i 's/^\(kernel.*\)[[:blank:]]\+splash\(.*\)$/\1\2/g' /boot/grub/menu.lst; \
+    in-target sed -i 's/^[[:blank:]]\*\(linux.*\)[[:blank:]]\+quiet\(.*\)$/\1\2/g' /boot/grub/grub.cfg; \
     in-target sed -i '$ a cloud-user ALL=(ALL) NOPASSWD: ALL' /etc/sudoers; \
     in-target sed -i 's/^\([[:blank:]]*user:[[:blank:]]\+\)ubuntu$/\1cloud-user/' /etc/cloud/cloud.cfg; \
     in-target mv /etc/cloud/templates/sources.list.tmpl /etc/cloud/templates/sources.list.tmpl--disabled; \
@@ -118,6 +117,13 @@ d-i preseed/late_command string \
     echo "remove this message from /etc/issue file."                                        >>/target/etc/issue ;\
     echo                                                                                    >>/target/etc/issue ;\
     in-target curl http://bazaar.launchpad.net/~cloud-utils-dev/cloud-utils/trunk/download/head:/growpart-20110225134600-d84xgz6209r194ob-1/growpart -o /usr/bin/growpart; \
+    in-target sed -i "s/\[ \(.*\) -gt \(.*mbr_max_512.*\) \]/echo \1 \2\|awk '{if(\$1<\$2)exit 1\}'/" /usr/bin/growpart; \
     in-target chmod 755 /usr/bin/growpart; \
+    in-target curl http://bazaar.launchpad.net/~cloud-initramfs-tools/cloud-initramfs-tools/trunk/download/head:/growroot-20110228195634-hyxy7n1nt4n6pq7r-22/growroot -o /etc/initramfs-tools/hooks/growroot; \
+    in-target curl http://bazaar.launchpad.net/~cloud-initramfs-tools/cloud-initramfs-tools/trunk/download/head:/growroot-20110228195634-hyxy7n1nt4n6pq7r-35/growroot -o /etc/initramfs-tools/scripts/local-bottom/growroot; \
+    in-target sed -i "s:^\(.*\$(growpart.*2>\)\&1\().*\)$:\1/dev/null\2:" /etc/initramfs-tools/scripts/local-bottom/growroot ;\
+    in-target chmod 755 /etc/initramfs-tools/hooks/growroot /etc/initramfs-tools/scripts/local-bottom/growroot ;\
+    in-target sed -i '/^exit 0/ i resize2fs /dev/vda1' /etc/rc.local ;\
+    in-target update-initramfs -u ;\
     dd bs=1M if=/dev/zero of=/target/var/tmp/zeros || : ;\
     rm -f /target/var/tmp/zeros
