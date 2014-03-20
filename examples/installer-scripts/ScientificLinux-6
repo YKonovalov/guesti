@@ -7,7 +7,7 @@ auth --useshadow --enablemd5
 selinux --enforcing
 firewall --service=ssh
 network --bootproto=dhcp --device=eth0 --onboot=on
-services --enabled=network,sshd,rsyslog
+services --disabled network,wpa_supplicant,ip6tables,iptables --enabled=NetworkManager,sshd,cloud-init,rsyslog,ntpdate,ntpd
 
 text
 poweroff
@@ -19,17 +19,14 @@ ignoredisk --only-use=vda
 clearpart --all --drives=vda
 zerombr
 bootloader --location=mbr --driveorder=vda --append="console=ttyS0,115200n8 console=tty0"
-
-part /boot --fstype=ext4 --size=500
-part pv.rootdisk --grow --size=1
-volgroup bootvols --pesize=4096 pv.rootdisk
-logvol / --fstype=ext4 --name=root --vgname=bootvols --grow --size=6200 --grow
-logvol swap --name=swap --vgname=bootvols --grow --size=1024 --maxsize=10048
+part / --asprimary --fstype="ext4" --size=999 --label=root --grow
 
 #
 # Repositories
+repo --name="SL-fastbugs" --baseurl="http://mirror.yandex.ru/scientificlinux/6/x86_64/updates/fastbugs/"
 repo --name="SL-security" --baseurl="http://mirror.yandex.ru/scientificlinux/6/x86_64/updates/security/"
-repo --name="EPEL-6" --baseurl="http://mirrors.kernel.org/fedora-epel/6/x86_64/"
+repo --name="EPEL-6" --baseurl="http://mirror.yandex.ru/epel/6/x86_64/"
+repo --name="EPEL-6-testing" --baseurl="http://mirror.yandex.ru/epel/testing/6/x86_64/"
 
 #
 #
@@ -51,6 +48,7 @@ chkconfig
 rootfiles
 yum
 vim-minimal
+mc
 acpid
 openssh-clients
 openssh-server
@@ -61,14 +59,20 @@ sudo
 dhclient
 iputils
 
+# Dual-stack init is much better with NM
+NetworkManager
+ntp
+ntpdate
+
 # package to setup cloudy bits for us
 cloud-init
+cloud-utils-growpart
+dracut-modules-growroot
+
 epel-release
 
 -firstboot
 -biosdevname
--NetworkManager-glib
--NetworkManager
 
 %end
 
@@ -80,18 +84,17 @@ epel-release
 
 rename -v  .old "" /etc/sysconfig/*old
 
-# create cloud-user
+echo -n "Create cloud-user"
 useradd cloud-user
 echo -e 'cloud-user\tALL=(ALL)\tNOPASSWD: ALL' >> /etc/sudoers
-sed -i -e "s/^\([[:blank:]]*user:[[:blank:]]*\)ec2-user$/\1cloud-user/" /etc/cloud/cloud.cfg
+sed -i -e "s/^\([[:blank:]]\+name:[[:blank:]]\+\)cloud-user$/\1cloud-user/" /etc/cloud/cloud.cfg
+#sed -i -e "s/^\([[:blank:]]*user:[[:blank:]]*\)ec2-user$/\1cloud-user/" /etc/cloud/cloud.cfg
 
-# cloud-init in EPEL6 has debian artifacts. So following debian-to-el6 hack is needed
-sed -ie '/^HOSTNAME=/ d; a HOSTNAME=$(cat /etc/hostname||echo localhost)' /etc/sysconfig/network
-echo "localhost.localdomain" > /etc/hostname
-
+echo -n "Network fixes"
 # remove persistant binding for eth0
 rm -f /etc/udev/rules.d/70-persistent-net.rules
 
+# enable dhcpv6
 cat > /etc/sysconfig/network-scripts/ifcfg-eth0 << EOF
 DEVICE=eth0
 TYPE=Ethernet
@@ -100,6 +103,12 @@ BOOTPROTO=dhcp
 IPV6INIT=yes
 DHCPV6C=yes
 DHCPV6C_OPTIONS=-nw
+EOF
+
+# cloud-init needs to wait for IP
+cat > /etc/sysconfig/network << EOF
+NETWORKING=yes
+NETWORKWAIT=yes
 EOF
 
 # lock root

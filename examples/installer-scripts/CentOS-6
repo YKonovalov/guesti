@@ -7,7 +7,7 @@ auth --useshadow --enablemd5
 selinux --enforcing
 firewall --service=ssh
 network --bootproto=dhcp --device=eth0 --onboot=on
-services --disabled network,wpa_supplicant,ip6tables --enabled=NetworkManager,sshd,cloud-init,rsyslog
+services --disabled network,wpa_supplicant,ip6tables,iptables --enabled=NetworkManager,sshd,cloud-init,rsyslog,ntpdate,ntpd
 
 text
 poweroff
@@ -19,18 +19,13 @@ ignoredisk --only-use=vda
 clearpart --all --drives=vda
 zerombr
 bootloader --location=mbr --driveorder=vda --append="console=ttyS0,115200n8 console=tty0"
-
-part /boot --fstype=ext4 --size=500
-part pv.rootdisk --grow --size=1
-volgroup bootvols --pesize=4096 pv.rootdisk
-logvol / --fstype=ext4 --name=root --vgname=bootvols --grow --size=6200 --grow
-logvol swap --name=swap --vgname=bootvols --grow --size=1024 --maxsize=10048
+part / --asprimary --fstype="ext4" --size=999 --label=root --grow
 
 #
 # Repositories
 repo --name="C6-Updates" --baseurl="http://mirror.yandex.ru/centos/6/updates/x86_64/"
-repo --name="EPEL-6" --baseurl="http://mirrors.kernel.org/fedora-epel/6/x86_64/"
-repo --name="EPEL-6-testing" --baseurl="http://mirrors.kernel.org/fedora-epel/testing/6/x86_64/"
+repo --name="EPEL-6" --baseurl="http://mirror.yandex.ru/epel/6/x86_64/"
+repo --name="EPEL-6-testing" --baseurl="http://mirror.yandex.ru/epel/testing/6/x86_64/"
 
 #
 #
@@ -52,6 +47,7 @@ chkconfig
 rootfiles
 yum
 vim-minimal
+mc
 acpid
 openssh-clients
 openssh-server
@@ -64,9 +60,14 @@ iputils
 
 # Dual-stack init is much better with NM
 NetworkManager
+ntp
+ntpdate
 
 # package to setup cloudy bits for us
 cloud-init
+cloud-utils-growpart
+dracut-modules-growroot
+
 epel-release
 
 -firstboot

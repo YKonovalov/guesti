@@ -103,6 +103,7 @@ d-i preseed/late_command string \
     in-target sed -i 's/^\([[:blank:]]*user:[[:blank:]]\+\)ubuntu$/\1cloud-user/' /etc/cloud/cloud.cfg; \
     in-target mv /etc/cloud/templates/sources.list.tmpl /etc/cloud/templates/sources.list.tmpl--disabled; \
     in-target mv /etc/cloud/templates/hosts.tmpl /etc/cloud/templates/hosts.tmpl--disabled; \
+    sed "/^127.0.0.1[[:blank:]]\+localhost/! s/^127.0.\(1\|0\).1[[:blank:]]\+.*$//" /etc/hosts >/target/etc/hosts; \
     printf "id-assoc na 0 { };\ninterface eth0\n{\n"                                   >/target/etc/wide-dhcpv6/dhcp6c.conf; \
     printf "  send ia-na 0;\n  request domain-name-servers;\n"                        >>/target/etc/wide-dhcpv6/dhcp6c.conf; \
     printf "  request domain-name;\n  script \"/etc/wide-dhcpv6/dhcp6c-script\";\n};\n" >>/target/etc/wide-dhcpv6/dhcp6c.conf; \

@@ -105,6 +105,7 @@ d-i preseed/late_command string \
     in-target sed -i "s/^\(.*Please login as the \)ubuntu\( user.*\)$/\1' + user + '\2/" /usr/bin/ec2-fetch-credentials; \
     in-target mv /etc/ec2-init/templates/sources.list.tmpl /etc/ec2-init/templates/sources.list.tmpl--disabled; \
     in-target sed -i 's/ubuntu/cloud-user/' /etc/ec2-init/ec2-config.cfg; \
+    sed "/^127.0.0.1[[:blank:]]\+localhost/! s/^127.0.\(1\|0\).1[[:blank:]]\+.*$//" /etc/hosts >/target/etc/hosts; \
     printf "compat=1\n" > /target/etc/ec2-init/is-compat-env; \
     printf "id-assoc na 0 { };\ninterface eth0\n{\n"                                   >/target/etc/wide-dhcpv6/dhcp6c.conf; \
     printf "  send ia-na 0;\n  request domain-name-servers;\n"                        >>/target/etc/wide-dhcpv6/dhcp6c.conf; \

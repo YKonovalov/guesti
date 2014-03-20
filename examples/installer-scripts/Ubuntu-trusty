@@ -103,11 +103,13 @@ d-i preseed/late_command string \
     in-target sed -i 's;^\([[:blank:]]\+security:[[:blank:]]\+\)http://security.*$;\1http://mirror.yandex.ru/ubuntu;' /etc/cloud/cloud.cfg; \
     in-target sed -i '/^[[:blank:]-]\+http:\/\/%(ec2_region)s.*/ d' /etc/cloud/cloud.cfg; \
     in-target sed -i 's;^\([[:blank:]-]\+\)http:.*$;\1http://mirror.yandex.ru/ubuntu/;' /etc/cloud/cloud.cfg; \
+    in-target sed -i "/^preserve_hostname:/ a manage_etc_hosts: false\napt_preserve_sources_list: true\n" /etc/cloud/cloud.cfg; \
+    in-target sed -i "/^127.0.0.1[[:blank:]]\+localhost/! s/^127.0.\(1\|0\).1[[:blank:]]\+.*$//" /etc/hosts; \
     printf "auto lo\niface lo inet loopback\n\n" > /etc/network/interfaces; \
     printf "auto eth0\niface eth0 inet dhcp\n"   >> /etc/network/interfaces; \
     printf "iface eth0 inet6 auto\n privext 0\n" >> /etc/network/interfaces; \
     printf "iface eth0 inet6 dhcp\n accept_ra 1\n autoconf 1\n" >> /etc/network/interfaces; \
-    printf " pre-up rdisc6 -1 \$IFACE|grep '^Stateful address conf.\s*:\s*Yes\$'\n" >> /etc/network/interfaces; \
+    printf "#pre-up rdisc6 -1 \$IFACE|grep '^Stateful address conf.\s*:\s*Yes\$'\n" >> /etc/network/interfaces; \
     echo "Please note: By default it is not possible to login at this terminal. The system" >>/target/etc/issue ;\
     echo "initially configured for SSH access only. Moreover, a single ssh key - the one"   >>/target/etc/issue ;\
     echo "specified at run time could be used to connect to this machine. To access this"   >>/target/etc/issue ;\
