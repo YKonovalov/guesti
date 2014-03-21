@@ -20,7 +20,7 @@ d-i netcfg/choose_interface select auto
 d-i netcfg/dhcp_timeout string 60
 d-i netcfg/dhcp_failed note
 d-i netcfg/dhcp_options select Configure network manually
-d-i netcfg/get_hostname string cloudguest
+d-i netcfg/get_hostname string newborn
 d-i netcfg/wireless_wep string
 d-i netcfg/target_network_config ifupdown
 
@@ -71,14 +71,13 @@ d-i apt-setup/local0/repository string http://ppa.launchpad.net/ubuntu-on-ec2/pp
 d-i apt-setup/local0/key string http://keyserver.ubuntu.com:11371/pks/lookup?search=0x0926ed02b2142b5c692f424ee048451d9ee6d873&op=get
 d-i apt-setup/local0/comment string Ubuntu on EC2
 
-tasksel tasksel/first multiselect standard, ssh-server
-
+tasksel tasksel/first multiselect ssh-server
+d-i pkgsel/install-language-support boolean false
 d-i pkgsel/include string linux-server openssh-server \
     ec2-init \
-    vim mc screen w3m ncurses-term \
-    sudo bc curl \
-    acpid wide-dhcpv6-client ndisc6
-d-i pkgsel/exclude wireless-tools wpasupplicant
+    vim mc screen w3m ncurses-term man \
+    sudo bc curl sysvconfig \
+    acpid wide-dhcpv6-client ndisc6 ntp
 
 ### Bootloader
 d-i grub-installer/bootdev string /dev/vda
@@ -103,9 +102,12 @@ d-i preseed/late_command string \
     in-target sed -i 's/^\(kernel.*\)[[:blank:]]\+splash\(.*\)$/\1\2/g' /boot/grub/menu.lst; \
     in-target sed -i '$ a cloud-user ALL=(ALL) NOPASSWD: ALL' /etc/sudoers; \
     in-target sed -i "s/^\(.*Please login as the \)ubuntu\( user.*\)$/\1' + user + '\2/" /usr/bin/ec2-fetch-credentials; \
+    in-target sed -i "/Waiting for EC2/ i log_daemon_msg \"Waiting for IPv4\"\nwhile ip addr show dev eth0|awk '{if(\$1==\"inet\")exit 1}'; do sleep 5; done" /etc/init.d/ec2-init; \
+    in-target chown -R dhcp /var/lib/dhcp3; \
     in-target mv /etc/ec2-init/templates/sources.list.tmpl /etc/ec2-init/templates/sources.list.tmpl--disabled; \
     in-target sed -i 's/ubuntu/cloud-user/' /etc/ec2-init/ec2-config.cfg; \
-    sed "/^127.0.0.1[[:blank:]]\+localhost/! s/^127.0.\(1\|0\).1[[:blank:]]\+.*$//" /etc/hosts >/target/etc/hosts; \
+    sed "/^127.0.0.1[[:blank:]]\+localhost/! s/^\(127.0.\(1\|0\).1[[:blank:]]\+\).*$/\1newborn/" /etc/hosts >/target/etc/hosts; \
+    printf "newborn\n" > /target/etc/hostname; \
     printf "compat=1\n" > /target/etc/ec2-init/is-compat-env; \
     printf "id-assoc na 0 { };\ninterface eth0\n{\n"                                   >/target/etc/wide-dhcpv6/dhcp6c.conf; \
     printf "  send ia-na 0;\n  request domain-name-servers;\n"                        >>/target/etc/wide-dhcpv6/dhcp6c.conf; \

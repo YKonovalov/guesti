@@ -69,14 +69,13 @@ d-i apt-setup/universe boolean true
 d-i apt-setup/backports boolean true
 d-i apt-setup/services-select multiselect
 
-tasksel tasksel/first multiselect standard, ssh-server
-
+tasksel tasksel/first multiselect ssh-server
+d-i pkgsel/install-language-support boolean false
 d-i pkgsel/include string linux-virtual openssh-server \
     cloud-init cloud-initramfs-growroot cloud-initramfs-rescuevol \
-    vim mc byobu screen tmux w3m \
-    sudo bc curl ndisc6 \
+    vim mc byobu screen tmux w3m man \
+    sudo bc curl ndisc6 ntp \
     acpid fonts-ubuntu-font-family-console
-d-i pkgsel/exclude wireless-tools wpasupplicant iw
 
 ### Bootloader
 d-i grub-installer/bootdev string /dev/vda
@@ -96,6 +95,7 @@ tmpreaper tmpreaper/readsecurity_upgrading note
 
 # Clear network iface mapping; force network to wait for dhcp before cloud-init
 d-i preseed/late_command string \
+    in-target dpkg -r language-pack-gnome-en language-pack-gnome-en-base; \
     in-target rm -f /etc/udev/rules.d/70-persistent-net.rules; \
     in-target sed -i '$ a cloud-user ALL=(ALL) NOPASSWD: ALL' /etc/sudoers; \
     in-target sed -i 's/^\([[:blank:]]\+name:[[:blank:]]\+\)ubuntu$/\1cloud-user/' /etc/cloud/cloud.cfg; \
@@ -104,7 +104,8 @@ d-i preseed/late_command string \
     in-target sed -i '/^[[:blank:]-]\+http:\/\/%(ec2_region)s.*/ d' /etc/cloud/cloud.cfg; \
     in-target sed -i 's;^\([[:blank:]-]\+\)http:.*$;\1http://mirror.yandex.ru/ubuntu/;' /etc/cloud/cloud.cfg; \
     in-target sed -i "/^preserve_hostname:/ a manage_etc_hosts: false\napt_preserve_sources_list: true\n" /etc/cloud/cloud.cfg; \
-    in-target sed -i "/^127.0.0.1[[:blank:]]\+localhost/! s/^127.0.\(1\|0\).1[[:blank:]]\+.*$//" /etc/hosts; \
+    in-target sed -i "/^127.0.0.1[[:blank:]]\+localhost/! s/^\(127.0.\(1\|0\).1[[:blank:]]\+\).*$/\1newborn/" /etc/hosts; \
+    printf "newborn\n" > /target/etc/hostname; \
     printf "auto lo\niface lo inet loopback\n\n" > /etc/network/interfaces; \
     printf "auto eth0\niface eth0 inet dhcp\n"   >> /etc/network/interfaces; \
     printf "iface eth0 inet6 auto\n privext 0\n" >> /etc/network/interfaces; \

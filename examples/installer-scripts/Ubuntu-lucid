@@ -70,14 +70,13 @@ d-i apt-setup/backports boolean true
 d-i apt-setup/services-select multiselect
 #d-i apt-setup/local0/repository string http://dist.yandex.ru/common stable all amd64
 
-tasksel tasksel/first multiselect standard, ssh-server
-
+tasksel tasksel/first multiselect ssh-server
+d-i pkgsel/install-language-support boolean false
 d-i pkgsel/include string linux-virtual openssh-server \
     cloud-init \
-    vim mc byobu screen tmux w3m \
+    vim mc byobu screen tmux w3m man \
     sudo bc curl ndisc6 \
-    acpid wide-dhcpv6-client
-d-i pkgsel/exclude wireless-tools wpasupplicant iw
+    acpid wide-dhcpv6-client ndisc6 ntp
 
 ### Bootloader
 d-i grub-installer/bootdev string /dev/vda
@@ -97,13 +96,15 @@ tmpreaper tmpreaper/readsecurity_upgrading note
 
 # Clear network iface mapping; force network to wait for dhcp before cloud-init
 d-i preseed/late_command string \
+    in-target dpkg -r language-pack-gnome-en language-pack-gnome-en-base; \
     in-target rm -f /etc/udev/rules.d/70-persistent-net.rules; \
     in-target sed -i 's/^[[:blank:]]\*\(linux.*\)[[:blank:]]\+quiet\(.*\)$/\1\2/g' /boot/grub/grub.cfg; \
     in-target sed -i '$ a cloud-user ALL=(ALL) NOPASSWD: ALL' /etc/sudoers; \
     in-target sed -i 's/^\([[:blank:]]*user:[[:blank:]]\+\)ubuntu$/\1cloud-user/' /etc/cloud/cloud.cfg; \
     in-target mv /etc/cloud/templates/sources.list.tmpl /etc/cloud/templates/sources.list.tmpl--disabled; \
     in-target mv /etc/cloud/templates/hosts.tmpl /etc/cloud/templates/hosts.tmpl--disabled; \
-    sed "/^127.0.0.1[[:blank:]]\+localhost/! s/^127.0.\(1\|0\).1[[:blank:]]\+.*$//" /etc/hosts >/target/etc/hosts; \
+    sed "/^127.0.0.1[[:blank:]]\+localhost/! s/^\(127.0.\(1\|0\).1[[:blank:]]\+\).*$/\1newborn/" /etc/hosts >/target/etc/hosts; \
+    printf "newborn\n" > /target/etc/hostname; \
     printf "id-assoc na 0 { };\ninterface eth0\n{\n"                                   >/target/etc/wide-dhcpv6/dhcp6c.conf; \
     printf "  send ia-na 0;\n  request domain-name-servers;\n"                        >>/target/etc/wide-dhcpv6/dhcp6c.conf; \
     printf "  request domain-name;\n  script \"/etc/wide-dhcpv6/dhcp6c-script\";\n};\n" >>/target/etc/wide-dhcpv6/dhcp6c.conf; \
