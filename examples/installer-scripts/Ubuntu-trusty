@@ -74,7 +74,7 @@ d-i pkgsel/install-language-support boolean false
 d-i pkgsel/include string linux-virtual openssh-server \
     cloud-init cloud-initramfs-growroot cloud-initramfs-rescuevol \
     vim mc byobu screen tmux w3m man \
-    sudo bc curl ndisc6 ntp \
+    sudo bc curl ndisc6 vzctl ntp \
     acpid fonts-ubuntu-font-family-console
 
 ### Bootloader
@@ -111,6 +111,8 @@ d-i preseed/late_command string \
     printf "iface eth0 inet6 auto\n privext 0\n" >> /etc/network/interfaces; \
     printf "iface eth0 inet6 dhcp\n accept_ra 1\n autoconf 1\n" >> /etc/network/interfaces; \
     printf "#pre-up rdisc6 -1 \$IFACE|grep '^Stateful address conf.\s*:\s*Yes\$'\n" >> /etc/network/interfaces; \
+    printf "net.ipv6.conf.eth0.ndisc_notify = 1\nnet.ipv4.conf.eth0.arp_notify = 1\n" >> /target/etc/sysctl.conf; \
+    printf "[ \"\$reason\" = \"BOUND6\" ] && ndsend \$new_ip6_address \$interface\n" > /target/etc/dhcp/dhclient-exit-hooks.d/ndsend; \
     echo "Please note: By default it is not possible to login at this terminal. The system" >>/target/etc/issue ;\
     echo "initially configured for SSH access only. Moreover, a single ssh key - the one"   >>/target/etc/issue ;\
     echo "specified at run time could be used to connect to this machine. To access this"   >>/target/etc/issue ;\
