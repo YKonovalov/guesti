@@ -77,7 +77,10 @@ d-i pkgsel/include string linux-server openssh-server \
     ec2-init \
     vim mc screen w3m ncurses-term man \
     sudo bc curl sysvconfig \
-    acpid wide-dhcpv6-client ndisc6 ntp
+    acpid ndisc6 wide-dhcpv6-client
+#d-i dibbler-client/start boolean true
+#d-i dibbler-client/interfaces string eth0
+#d-i dibbler-client/options multiselect dns,domain
 
 ### Bootloader
 d-i grub-installer/bootdev string /dev/vda
@@ -109,9 +112,14 @@ d-i preseed/late_command string \
     sed "/^127.0.0.1[[:blank:]]\+localhost/! s/^\(127.0.\(1\|0\).1[[:blank:]]\+\).*$/\1newborn/" /etc/hosts >/target/etc/hosts; \
     printf "newborn\n" > /target/etc/hostname; \
     printf "compat=1\n" > /target/etc/ec2-init/is-compat-env; \
-    printf "id-assoc na 0 { };\ninterface eth0\n{\n"                                   >/target/etc/wide-dhcpv6/dhcp6c.conf; \
-    printf "  send ia-na 0;\n  request domain-name-servers;\n"                        >>/target/etc/wide-dhcpv6/dhcp6c.conf; \
+    printf "id-assoc na 0 { };\ninterface eth0\n{\n"                                     >/target/etc/wide-dhcpv6/dhcp6c.conf; \
+    printf "  send ia-na 0;\n  request domain-name-servers;\n"                          >>/target/etc/wide-dhcpv6/dhcp6c.conf; \
     printf "  request domain-name;\n  script \"/etc/wide-dhcpv6/dhcp6c-script\";\n};\n" >>/target/etc/wide-dhcpv6/dhcp6c.conf; \
+    sed -i "/^exit 0/ i /usr/sbin/ndisc_update >dev/null 2>&1 &" /target/etc/wide-dhcpv6/dhcp6c-script; \
+    printf '#!/bin/sh\nPIDFILE="$(mktemp)"\nCLEAN=\ncleanup() {\n if [ -z "$CLEAN" ]; then\n\tkill `cat "$PIDFILE"` 2>/dev/null\n\trm -f "$PIDFILE"\n\tCLEAN=yes\n fi\n}\ntrap cleanup 0 1 2 15\n(ip -6 monitor address & echo $! > "$PIDFILE")|\n\tsed -n "s;^[[:digit:]]\+:\s\+\([[:alnum:]]\+\)\s\+inet6\s\+\([[:alnum:]:]\+\)/[[:digit:]]\+\s\+scope global[[:blank:]]*$;\\2 \\1;;ta;b;:a p;ekill \$(cat $PIDFILE)"' >/target/usr/bin/wait_for_ipv6_global_permanent; \
+    chmod a+x /target/usr/bin/wait_for_ipv6_global_permanent; \
+    printf '#!/bin/sh\nIP= IFACE= MAC= EOPT= OUT=\nwhile true; do\n\tIP=\n\tcase "${IP:=$1}" in\n\t\tmonitor)\n\t\t\tlogger -t "ndisc_update[$$]" "Waiting for permanent IPv6 address..."\n\t\t\tO="$(wait_for_ipv6_global_permanent)"\n\t\t\tif [ -z "$O" ]; then\n\t\t\t\tlogger -t "ndisc_update[$$]" "ERROR: Monitor exit with no result"\n\t\t\t\texit 1\n\t\t\telse\n\t\t\t\tset $O\n\t\t\tfi\n\t\t\t;;\n\t\t"")\n\t\t\tO="$(ip -6 -o a s scope global permanent|head -1|awk '"'"'{split($4,a,"/"); print a[1]" "$2}'"'"')"\n\t\t\tif [ -z "$O" ]; then\n\t\t\t\tlogger -t "ndisc_update[$$]" "No permanent IPv6 addresses found"\n\t\t\t\tset "monitor"\n\t\t\telse\n\t\t\t\tset $O\n\t\t\tfi\n\t\t\t;;\n\t\t-h|--help)\n\t\t\techo "usage: $0 [monitor|{IPv6 address}] [interface] [mac]"\n\t\t\texit 0\n\t\t\t;;\n\t\t*)\n\t\t\tbreak\n\t\t\t;;\n\tesac\ndone\nIFACE="${2:-$(ip -6 -o a s|grep " $IP/"|cut -d" " -f2)}"\nIFACE="${IFACE:-eth0}"\nMAC="${3:-$(cat /sys/class/net/$IFACE/address)}"\nEOPT="${MAC:+src=\\"$MAC\\"}"\nMAC="${MAC:-auto}"\n'"echo 'a=Ether('\$EOPT')/IPv6()/ICMPv6ND_NA(tgt=\"'\$IP'\",R=0);sendp(a/ICMPv6NDOptDstLLAddr(lladdr=a.src),iface=\"'\$IFACE'\")'|\n"' if OUT="$(/opt/scapy-2.2.0/run_scapy 2>&1)"; echo "$OUT"|grep ^Sent >/dev/null; then\n\tlogger -t "ndisc_update[$$]" "Unsolicited Neighbor Advertisement sent for $IP with mac $MAC via $IFACE"\n else\n\techo "$@\\n$OUT\\n"|sed "s/[^[:print:]]*//g"\n fi\n' > /target/usr/sbin/ndisc_update; \
+    chmod o+x /target/usr/sbin/ndisc_update; \
     sed -i 's/halt/poweroff/g' /lib/debian-installer/exit ;\
     echo "Please note: By default it is not possible to login at this terminal. The system" >>/target/etc/issue ;\
     echo "initially configured for SSH access only. Moreover, a single ssh key - the one"   >>/target/etc/issue ;\
@@ -123,6 +131,10 @@ d-i preseed/late_command string \
     echo "altered by the administrator of this machine. In later case please consider to"   >>/target/etc/issue ;\
     echo "remove this message from /etc/issue file."                                        >>/target/etc/issue ;\
     echo                                                                                    >>/target/etc/issue ;\
+    in-target mkdir -p /opt; \
+    in-target wget --no-check-certificate https://launchpad.net/ubuntu/+archive/primary/+files/scapy_2.2.0.orig.tar.gz -O /opt/scapy_2.2.0.orig.tar.gz; \
+    in-target tar zxvC /opt -f /opt/scapy_2.2.0.orig.tar.gz; \
+    in-target rm -f /opt/scapy_2.2.0.orig.tar.gz; \
     in-target curl http://bazaar.launchpad.net/~cloud-utils-dev/cloud-utils/trunk/download/head:/growpart-20110225134600-d84xgz6209r194ob-1/growpart -o /usr/bin/growpart; \
     in-target sed -i "s/\[ \(.*\) -gt \(.*mbr_max_512.*\) \]/echo \1 \2\|awk '{if(\$1<\$2)exit 1\}'/" /usr/bin/growpart; \
     in-target chmod 755 /usr/bin/growpart; \
