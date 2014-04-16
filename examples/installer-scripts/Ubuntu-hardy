@@ -76,7 +76,7 @@ d-i pkgsel/install-language-support boolean false
 d-i pkgsel/include string linux-server openssh-server \
     ec2-init \
     vim mc screen w3m ncurses-term man \
-    sudo bc curl sysvconfig \
+    sudo bc curl \
     acpid ndisc6 wide-dhcpv6-client
 #d-i dibbler-client/start boolean true
 #d-i dibbler-client/interfaces string eth0
