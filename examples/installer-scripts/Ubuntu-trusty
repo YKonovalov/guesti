@@ -117,7 +117,7 @@ d-i preseed/late_command string \
     printf ' pre-up /usr/sbin/duid-uuid-update $IFACE\n' >> /etc/network/interfaces; \
     printf "#pre-up rdisc6 -1 \$IFACE|grep '^Stateful address conf.\s*:\s*Yes\$'\n" >> /etc/network/interfaces; \
     printf 'iface eth0 inet dhcp\n'   >> /etc/network/interfaces; \
-    printf '#/bin/sh\nIFACE=${1:-eth0}\nLEASE=${2:-/var/lib/dhcp/dhclient6.$IFACE.leases}\n\nduid="default-duid \\"\\000\\004"\nfor i in `sed -e s/-//g -e "s/\(..\)/\\1 /g" /sys/devices/virtual/dmi/id/product_uuid`; do\n num=`printf "%%d" 0x$i`\n octnum=`printf "\\%%03o" 0x$i`\n if [ $num -lt 127 -a $num -gt 31 ]; then\n  octnum=`printf $octnum`\n fi\n duid=$duid$octnum\ndone\nduid="$duid\\";"\n\nif [ "$(head -1 $LEASE)" != "$duid" ]; then\n logger "DUID updated"\n echo "$duid" > $LEASE\nfi\n' >/target/usr/sbin/duid-uuid-update; \
+    printf '#!/bin/bash\nIFACE=${1:-eth0}\nLEASE=${2:-/var/lib/dhcp/dhclient6.$IFACE.leases}\n\nduid="default-duid \\"\\000\\004"\nfor i in `sed -e s/-//g -e "s/\(..\)/\\1 /g" /sys/devices/virtual/dmi/id/product_uuid`; do\n num=`printf "%%d" 0x$i`\n octnum=`printf "\\%%03o" 0x$i`\n if [ $num -lt 127 -a $num -gt 31 ]; then\n  octnum=`printf $octnum`\n fi\n duid=$duid$octnum\ndone\nduid="$duid\\";"\n\nif [ "$(head -1 $LEASE)" != "$duid" ]; then\n echo "$duid" > $LEASE\nfi\n' >/target/usr/sbin/duid-uuid-update; \
     chmod a+x /target/usr/sbin/duid-uuid-update; \
     printf "net.ipv6.conf.eth0.ndisc_notify = 1\nnet.ipv4.conf.eth0.arp_notify = 1\n" >> /target/etc/sysctl.conf; \
     printf "[ \"\$reason\" = \"BOUND6\" ] && ndsend \$new_ip6_address \$interface\n" > /target/etc/dhcp/dhclient-exit-hooks.d/ndsend; \
