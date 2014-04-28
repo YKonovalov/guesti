@@ -88,6 +88,8 @@ For multiboot --kernel and one or more --module normally required.""")
                                   help='URL for installer initrd file (for normal boot)')
     p_install_loader.add_argument('--module', action='append', dest='modules',
                                   help='URL(s) for installer modules file (for multiboot)')
+    p_install_loader.add_argument('--chain', dest='chain',
+                                  help='URL for installer chain loader file (for generic network boot)')
 
     add_args_os(p_install)
 
@@ -149,7 +151,11 @@ class OS_CLOUD(ABS_CLOUD):
                     modules = modules + "module " + m + "\n"
             kernel = args.kernel
             initrd = "initrd " + args.initrd + "\n" if args.initrd else "\n"
-            self.__menu = "#!ipxe\nkernel {0}\n{1}{2}boot\n".format(kernel, initrd, modules)
+            chain = args.chain
+            if chain:
+        	self.__menu = "#!ipxe\nchain {0}\n".format(chain)
+            else:
+        	self.__menu = "#!ipxe\nkernel {0}\n{1}{2}boot\n".format(kernel, initrd, modules)
             LOG.debug("iPXE script:\n---\n{0}\n---\n".format(self.__menu))
 
             # Template params
