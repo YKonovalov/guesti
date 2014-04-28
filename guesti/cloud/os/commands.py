@@ -194,10 +194,10 @@ class OS_CLOUD(ABS_CLOUD):
                 self.installer_name))
 
             osk = keystone_client.Client(username=self.username, password=self.password, tenant_id=self.tenant, auth_url=self.auth_url)
-            if not osk.authenticate():
-                LOG.error("Failed to authenticate to {0} tenant:{1} as:{2}.".format(self.auth_url, self.tenant, self.username))
-                exitcode = 1
-                sys.exit(exitcode)
+            #if not osk.authenticate():
+            #    LOG.error("Failed to authenticate to {0} tenant:{1} as:{2}.".format(self.auth_url, self.tenant, self.username))
+            #    exitcode = 1
+            #    sys.exit(exitcode)
             osi = glance_client.Client("1", endpoint=self.glance_url, token=osk.auth_token)
             osc = nova_client.Client('2', username=self.username, api_key=self.password, region_name=self.region, project_id=self.tenant_name, auth_url=self.auth_url, insecure=True, http_log_debug=True)
             instance = osc.servers.create(name=self.installer_name,
