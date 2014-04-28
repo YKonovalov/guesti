@@ -58,9 +58,11 @@ sudo
 #Allow for dhcp access
 dhclient
 iputils
+scapy
 
 # Dual-stack init is much better with NM
 NetworkManager
+avahi-autoipd
 ntp
 ntpdate
 
@@ -108,11 +110,127 @@ EOF
 # cloud-init needs to wait for IP
 cat > /etc/sysconfig/network << EOF
 NETWORKING=yes
-NETWORKWAIT=yes
+NETWORKWAIT=
 EOF
 
 # lock root
 passwd -l root
+
+
+printf '#!/bin/sh\nPIDFILE="$(mktemp)"\nCLEAN=\ncleanup() {\n if [ -z "$CLEAN" ]; then\n\tkill `cat "$PIDFILE"` 2>/dev/null\n\trm -f "$PIDFILE"\n\tCLEAN=yes\n fi\n}\ntrap cleanup 0 1 2 15\n(ip -6 monitor address & echo $! > "$PIDFILE")|\n\tsed -n "s;^[[:digit:]]\+:\s\+\([[:alnum:]]\+\)\s\+inet6\s\+\([[:alnum:]:]\+\)/[[:digit:]]\+\s\+scope global[[:blank:]]*$;\\2 \\1;;ta;b;:a p;ekill \$(cat $PIDFILE)"' >/usr/bin/wait_for_ipv6_global_permanent
+chmod o+x /usr/bin/wait_for_ipv6_global_permanent
+ 
+printf '#!/bin/sh\nIP= IFACE= MAC= EOPT= OUT=\nwhile true; do\n\tIP=\n\tcase "${IP:=$1}" in\n\t\tmonitor)\n\t\t\tlogger -t "ndisc_update[$$]" "Waiting for permanent IPv6 address..."\n\t\t\tO="$(wait_for_ipv6_global_permanent)"\n\t\t\tif [ -z "$O" ]; then\n\t\t\t\tlogger -t "ndisc_update[$$]" "ERROR: Monitor exit with no result"\n\t\t\t\texit 1\n\t\t\telse\n\t\t\t\tset $O\n\t\t\tfi\n\t\t\t;;\n\t\t"")\n\t\t\tO="$(ip -6 -o a s scope global permanent|head -1|awk '"'"'{split($4,a,"/"); print a[1]" "$2}'"'"')"\n\t\t\tif [ -z "$O" ]; then\n\t\t\t\tlogger -t "ndisc_update[$$]" "No permanent IPv6 addresses found"\n\t\t\t\tset "monitor"\n\t\t\telse\n\t\t\t\tset $O\n\t\t\tfi\n\t\t\t;;\n\t\t-h|--help)\n\t\t\techo "usage: $0 [monitor|{IPv6 address}] [interface] [mac]"\n\t\t\texit 0\n\t\t\t;;\n\t\t*)\n\t\t\tbreak\n\t\t\t;;\n\tesac\ndone\nIFACE="${2:-$(ip -6 -o a s|grep " $IP/"|cut -d" " -f2)}"\nIFACE="${IFACE:-eth0}"\nMAC="${3:-$(cat /sys/class/net/$IFACE/address)}"\nEOPT="${MAC:+src=\\"$MAC\\"}"\nMAC="${MAC:-auto}"\n'"echo 'a=Ether('\$EOPT')/IPv6()/ICMPv6ND_NA(tgt=\"'\$IP'\",R=0);sendp(a/ICMPv6NDOptDstLLAddr(lladdr=a.src),iface=\"'\$IFACE'\")'|\n"' if OUT="$(scapy 2>&1)"; echo "$OUT"|grep ^Sent >/dev/null; then\n\tlogger -t "ndisc_update[$$]" "Unsolicited Neighbor Advertisement sent for $IP with mac $MAC via $IFACE"\n else\n\techo "$@\\n$OUT\\n"|sed "s/[^[:print:]]*//g"\n fi\n' > /usr/sbin/ndisc_update
+chmod o+x /usr/sbin/ndisc_update
+
+printf '#!/bin/bash\nIFACE=${1:-eth0}\nLEASE=${2:-/var/lib/dhcp/dhclient6.$IFACE.leases}\n\nduid="default-duid \\"\\000\\004"\nfor i in `sed -e s/-//g -e "s/\(..\)/\\1 /g" /sys/devices/virtual/dmi/id/product_uuid`; do\n num=`printf "%%d" 0x$i`\n octnum=`printf "\\%%03o" 0x$i`\n if [ $num -lt 127 -a $num -gt 31 ]; then\n  octnum=`printf $octnum`\n fi\n duid=$duid$octnum\ndone\nduid="$duid\\";"\n\nif [ "$(head -1 $LEASE)" != "$duid" ]; then\n echo "$duid" > $LEASE\nfi\n' >/usr/sbin/duid-uuid-update
+chmod a+x /usr/sbin/duid-uuid-update
+
+cat << \EOF > /etc/NetworkManager/NetworkManager.conf 
+[main]
+plugins=keyfile
+EOF
+
+cat << \EOF > /etc/NetworkManager/system-connections/eth0 
+[connection]
+id=eth0
+uuid=4929951a-86d6-4298-b053-f9cecfca7c1c
+type=802-3-ethernet
+
+[ipv4]
+method=auto
+
+[ipv6]
+method=dhcp
+EOF
+chmod 600 /etc/NetworkManager/system-connections/eth0
+
+cat << \EOF > /etc/rc.d/init.d/avahi-autoipd
+#!/bin/sh
+#
+# avahi-autoipd:   IPv4LL daemon
+#
+# chkconfig: - 20 83
+# description:  This is a daemon for automatically configure link local IPv4 address
+#
+# processname: avahi-autoipd
+#
+### BEGIN INIT INFO
+# Provides: avahi_autoipd $ipv4ll
+# Required-Start: messagebus
+# Required-Stop: messagebus
+# Default-Start: 2 3 4 5
+# Default-Stop: 0 1 6
+# Short-Description: start and stop avahi-autoipd
+# Description: avahi_autoipd is IPv4LL daemon
+### END INIT INFO
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+# Source network configuration
+. /etc/sysconfig/network
+
+prog=avahi-autoipd
+
+RETVAL=0
+
+start()
+{
+    echo -n $"Starting IPv4LL daemon: "
+    daemon $prog -D eth0:avahi
+    RETVAL=$?
+    echo
+    [ $RETVAL -eq 0 ] && touch /var/lock/subsys/$prog
+    /usr/sbin/duid-uuid-update eth0 /var/lib/dhclient/dhclient6-4929951a-86d6-4298-b053-f9cecfca7c1c-eth0.lease
+    /usr/sbin/ndisc_update >/dev/null 2>&1 &
+    (wait_for_ipv6_global_permanent && ip -6 route del default dev eth0) >/dev/null 2>&1 &
+}
+
+stop()
+{
+    echo -n $"Stopping IPv4LL daemon: "
+    killproc $prog
+    RETVAL=$?
+    echo
+    if [ $RETVAL -eq 0 ]; then
+    rm -f /var/lock/subsys/$prog
+    fi
+}
+
+# See how we were called.
+case "$1" in
+    start)
+    start
+    ;;
+    stop)
+    stop
+    ;;
+    status)
+    status $prog
+    RETVAL=$?
+    ;;
+    restart)
+    stop
+    start
+    ;;
+    condrestart)
+    if [ -f /var/lock/subsys/$prog ]; then
+        stop
+        start
+    fi
+    ;;
+    *)
+    echo $"Usage: $0 {start|stop|status|restart|condrestart}"
+    ;;
+esac
+exit $RETVAL
+EOF
+
+chmod a+x /etc/rc.d/init.d/avahi-autoipd
+chkconfig --add avahi-autoipd
+
+echo "request subnet-mask, broadcast-address, time-offset, routers, domain-name, domain-search, domain-name-servers, ntp-servers , interface-mtu;" >> /etc/dhcp/dhclient-eth0.conf
 
 # put a message on the console
 cat << EOF >> /etc/issue

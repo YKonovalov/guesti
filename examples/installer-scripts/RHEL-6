@@ -122,32 +122,6 @@ EOF
 # lock root
 passwd -l root
 
-# put a message on the console
-cat << EOF >> /etc/issue
-Please note: By default it is not possible to login at this terminal. The system
-initially configured for SSH access only. Moreover, a single ssh key - the one
-specified at run time could be used to connect to this machine. To access this
-system, please run SSH client, choose correct SSH private key and specify
-username "cloud-user".
-
-The above notice might not be true if the configuration of the system has been
-altered by the administrator of this machine. In later case please consider to
-remove this message from /etc/issue file.
-
-EOF
-
-# Add RHEL repos
-for r in rhel-x86_64-server-6 rhel-x86_64-server-fastrack-6 rhel-x86_64-server-optional-6 rhel-x86_64-server-optional-fastrack-6 rhel-x86_64-server-supplementary-6 rhel-x86_64-server-v2vwin-6 rhn-tools-rhel-x86_64-server-6; do
-cat << EOF >> /etc/yum.repos.d/$r.repo 
-[$r]
-name="Red Hat Enterprise Linux $releasever - $basearch - $r"
-baseurl=http://rhel.yandex.net/rhel6/$r/getPackage/
-enabled=1
-gpgcheck=1
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
-EOF
-done
-
 
 printf '#!/bin/sh\nPIDFILE="$(mktemp)"\nCLEAN=\ncleanup() {\n if [ -z "$CLEAN" ]; then\n\tkill `cat "$PIDFILE"` 2>/dev/null\n\trm -f "$PIDFILE"\n\tCLEAN=yes\n fi\n}\ntrap cleanup 0 1 2 15\n(ip -6 monitor address & echo $! > "$PIDFILE")|\n\tsed -n "s;^[[:digit:]]\+:\s\+\([[:alnum:]]\+\)\s\+inet6\s\+\([[:alnum:]:]\+\)/[[:digit:]]\+\s\+scope global[[:blank:]]*$;\\2 \\1;;ta;b;:a p;ekill \$(cat $PIDFILE)"' >/usr/bin/wait_for_ipv6_global_permanent
 chmod o+x /usr/bin/wait_for_ipv6_global_permanent
@@ -263,5 +237,31 @@ chmod a+x /etc/rc.d/init.d/avahi-autoipd
 chkconfig --add avahi-autoipd
 
 echo "request subnet-mask, broadcast-address, time-offset, routers, domain-name, domain-search, domain-name-servers, ntp-servers , interface-mtu;" >> /etc/dhcp/dhclient-eth0.conf
+
+# put a message on the console
+cat << EOF >> /etc/issue
+Please note: By default it is not possible to login at this terminal. The system
+initially configured for SSH access only. Moreover, a single ssh key - the one
+specified at run time could be used to connect to this machine. To access this
+system, please run SSH client, choose correct SSH private key and specify
+username "cloud-user".
+
+The above notice might not be true if the configuration of the system has been
+altered by the administrator of this machine. In later case please consider to
+remove this message from /etc/issue file.
+
+EOF
+
+# Add RHEL repos
+for r in rhel-x86_64-server-6 rhel-x86_64-server-fastrack-6 rhel-x86_64-server-optional-6 rhel-x86_64-server-optional-fastrack-6 rhel-x86_64-server-supplementary-6 rhel-x86_64-server-v2vwin-6 rhn-tools-rhel-x86_64-server-6; do
+cat << EOF >> /etc/yum.repos.d/$r.repo 
+[$r]
+name="Red Hat Enterprise Linux $releasever - $basearch - $r"
+baseurl=http://rhel.yandex.net/rhel6/$r/getPackage/
+enabled=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+EOF
+done
 
 %end
