@@ -78,6 +78,7 @@ d-i pkgsel/include string linux-virtual openssh-server \
     sudo bc curl ndisc6 python-scapy avahi-autoipd ntp \
     acpid fonts-ubuntu-font-family-console
 # use scapy instead of ndsend due to https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=719095
+d-i cloud-init/datasources multiselect Ec2
 
 ### Bootloader
 d-i grub-installer/bootdev string /dev/vda
@@ -121,6 +122,8 @@ d-i preseed/late_command string \
     printf "[ \"\$reason\" = \"BOUND6\" ] && echo 'a=Ether()/IPv6()/ICMPv6ND_NA(tgt=\"'\$new_ip6_address'\",R=0);sendp(a/ICMPv6NDOptDstLLAddr(lladdr=a.src),iface=\"'\$interface'\")'|scapy\n" > /target/etc/dhcp/dhclient-exit-hooks.d/ndsend; \
     printf '#!/bin/bash\nIFACE=${1:-eth0}\nLEASE=${2:-/var/lib/dhcp/dhclient6.$IFACE.leases}\n\nduid="default-duid \\"\\000\\004"\nfor i in `sed -e s/-//g -e "s/\(..\)/\\1 /g" /sys/devices/virtual/dmi/id/product_uuid`; do\n num=`printf "%%d" 0x$i`\n octnum=`printf "\\%%03o" 0x$i`\n if [ $num -lt 127 -a $num -gt 31 ]; then\n  octnum=`printf $octnum`\n fi\n duid=$duid$octnum\ndone\nduid="$duid\\";"\n\nif [ "$(head -1 $LEASE)" != "$duid" ]; then\n echo "$duid" > $LEASE\nfi\n' >/target/usr/sbin/duid-uuid-update; \
     chmod a+x /target/usr/sbin/duid-uuid-update; \
+    sed -i "s/^\(net.ipv6.conf.\(all\|default\).use_tempaddr =\).*/\1 0/" /target/etc/sysctl.d/10-ipv6-privacy.conf; \
+    printf 'tmpfs /tmp tmpfs noauto,optional,nodev,noexec,nosuid 0 0\n' >> /target/etc/fstab; \
     echo "Please note: By default it is not possible to login at this terminal. The system" >>/target/etc/issue ;\
     echo "initially configured for SSH access only. Moreover, a single ssh key - the one"   >>/target/etc/issue ;\
     echo "specified at run time could be used to connect to this machine. To access this"   >>/target/etc/issue ;\

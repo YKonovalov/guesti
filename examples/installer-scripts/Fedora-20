@@ -207,6 +207,11 @@ truncate -c -s 0 /var/log/yum.log
 echo "Fixing SELinux contexts."
 /usr/sbin/fixfiles -R -a restore
 
+
+
+echo "request subnet-mask, broadcast-address, time-offset, routers, domain-name, domain-search, domain-name-servers, ntp-servers , interface-mtu;" >> /etc/dhcp/dhclient.conf
+
+
 # put a message on the console
 cat << EOF >> /etc/issue
 Please note: By default it is not possible to login at this terminal. The system

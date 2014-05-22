@@ -76,6 +76,8 @@ d-i pkgsel/include string linux-virtual openssh-server \
     vim mc byobu screen tmux w3m man \
     sudo bc curl ndisc6 vzctl ntp avahi-autoipd \
     acpid fonts-ubuntu-font-family-console
+cloud-init cloud-init/datasources multiselect Ec2
+cloud-init cloud-init/local-cloud-config string apt_preserve_sources_list: true
 
 ### Bootloader
 d-i grub-installer/bootdev string /dev/vda
@@ -121,6 +123,7 @@ d-i preseed/late_command string \
     chmod a+x /target/usr/sbin/duid-uuid-update; \
     printf "net.ipv6.conf.eth0.ndisc_notify = 1\nnet.ipv4.conf.eth0.arp_notify = 1\n" >> /target/etc/sysctl.conf; \
     printf "[ \"\$reason\" = \"BOUND6\" ] && ndsend \$new_ip6_address \$interface\n" > /target/etc/dhcp/dhclient-exit-hooks.d/ndsend; \
+    sed -i "s/^\(net.ipv6.conf.\(all\|default\).use_tempaddr =\).*/\1 0/" /target/etc/sysctl.d/10-ipv6-privacy.conf; \
     echo "Please note: By default it is not possible to login at this terminal. The system" >>/target/etc/issue ;\
     echo "initially configured for SSH access only. Moreover, a single ssh key - the one"   >>/target/etc/issue ;\
     echo "specified at run time could be used to connect to this machine. To access this"   >>/target/etc/issue ;\
