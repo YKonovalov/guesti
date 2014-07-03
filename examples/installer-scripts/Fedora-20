@@ -152,6 +152,7 @@ BOOTPROTO=dhcp
 IPV6INIT=yes
 DHCPV6C=yes
 DHCPV6C_OPTIONS=-nw
+DHCLIENTARGS=-nw
 EOF
 
 # generic localhost names
