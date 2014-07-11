@@ -102,6 +102,7 @@ EOF
 echo -n "Network fixes"
 # remove persistant binding for eth0
 rm -f /etc/udev/rules.d/70-persistent-net.rules
+echo "rm -f /etc/udev/rules.d/70-persistent-net.rules" >> /etc/rc.local
 
 # enable dhcpv6
 cat > /etc/sysconfig/network-scripts/ifcfg-eth0 << EOF
@@ -158,15 +159,13 @@ cat << \EOF > /etc/rc.d/init.d/avahi-autoipd
 #
 # avahi-autoipd:   IPv4LL daemon
 #
-# chkconfig: - 9 83
+# chkconfig: 2345 09 89
 # description:  This is a daemon for automatically configure link local IPv4 address
 #
 # processname: avahi-autoipd
 #
 ### BEGIN INIT INFO
 # Provides: avahi_autoipd $ipv4ll
-# Required-Start: messagebus
-# Required-Stop: messagebus
 # Default-Start: 2 3 4 5
 # Default-Stop: 0 1 6
 # Short-Description: start and stop avahi-autoipd
@@ -185,16 +184,22 @@ RETVAL=0
 
 start()
 {
+    echo -n $"DUID Update  "
+    /usr/sbin/duid-uuid-update eth0 /var/lib/dhclient/dhclient6-4929951a-86d6-4298-b053-f9cecfca7c1c-eth0.lease
+    /usr/sbin/duid-uuid-update eth0 /var/lib/dhclient/dhclient6-eth0.leases
+    /usr/sbin/duid-uuid-update eth0 /var/lib/dhclient/dhclient6.leases
+    echo
+
+    echo $"NDISC Update  "
+    /usr/sbin/ndisc_update >/dev/null 2>&1 &
+    #(wait_for_ipv6_global_permanent && ip -6 route del default dev eth0) >/dev/null 2>&1 &
+    echo
+
     echo -n $"Starting IPv4LL daemon: "
     daemon $prog -D eth0:avahi
     RETVAL=$?
     echo
     [ $RETVAL -eq 0 ] && touch /var/lock/subsys/$prog
-    /usr/sbin/duid-uuid-update eth0 /var/lib/dhclient/dhclient6-4929951a-86d6-4298-b053-f9cecfca7c1c-eth0.lease
-    /usr/sbin/duid-uuid-update eth0 /var/lib/dhclient/dhclient6-eth0.leases
-    /usr/sbin/ndisc_update >/dev/null 2>&1 &
-    rm -f /etc/udev/rules.d/70-persistent-net.rules ||:
-    #(wait_for_ipv6_global_permanent && ip -6 route del default dev eth0) >/dev/null 2>&1 &
 }
 
 stop()
