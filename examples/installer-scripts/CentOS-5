@@ -1,0 +1,309 @@
+# CentOS 5 kickstart customized for OpenStack.
+
+lang en_US.UTF-8
+keyboard us
+timezone --utc Europe/Moscow
+auth --useshadow --enablemd5
+selinux --disabled
+firewall --disabled --ssh
+network --bootproto=dhcp --device=eth0 --onboot=on
+#services --disabled network,wpa_supplicant,ip6tables,iptables --enabled=NetworkManager,sshd,cloud-init,rsyslog,ntpdate,ntpd
+services --disabled NetworkManager,wpa_supplicant,ip6tables,iptables,avahi-daemon,kudzu,restorecond --enabled=network,sshd,cloud-init,rsyslog,ntpdate,ntpd
+
+text
+poweroff
+skipx
+# will lock root in postinstall
+rootpw !!
+
+ignoredisk --only-use=vda
+clearpart --all --drives=vda
+zerombr
+bootloader --location=mbr --driveorder=vda --append="console=ttyS0,115200n8 console=tty0"
+
+part / --asprimary --fstype="ext3" --size=999 --label=root --grow
+
+url --url http://mirror.yandex.ru/centos/5/os/x86_64
+
+#
+# Repositories
+repo --name="Updates" --baseurl="http://mirror.yandex.ru/centos/5/updates/x86_64/"
+repo --name="EPEL-5" --baseurl="http://mirror.yandex.ru/epel/5/x86_64/"
+repo --name="EPEL-5-testing" --baseurl="http://mirror.yandex.ru/epel/testing/5/x86_64/"
+repo --name="OpenVZ tools" --baseurl="http://download.openvz.org/current/"
+
+#repo --name="rpmforge" --baseurl="http://apt.sw.be/redhat/el5/en/x86_64/rpmforge"
+#repo --name="DAG" --baseurl="http://apt.sw.be/redhat/el5/en/x86_64/dag"
+
+#
+#
+# Add all the packages after the base packages
+#
+%packages --nobase
+@core
+system-config-securitylevel-tui
+audit
+pciutils
+bash
+coreutils
+kernel
+
+e2fsprogs
+passwd
+policycoreutils
+chkconfig
+rootfiles
+yum
+vim-minimal
+mc
+acpid
+openssh-clients
+openssh-server
+curl
+sudo
+
+#Allow for dhcp access
+dhclient
+iputils
+vzctl-core
+
+avahi
+
+ntp
+#ntpdate
+
+# package to setup cloudy bits for us
+cloud-init
+
+epel-release
+#rpmforge-release
+
+-firstboot
+
+%pre
+dd if=/dev/zero of=/dev/vda bs=1024k count=1
+
+# more ec2-ify
+%post --erroronfail
+
+# the firewall rules get saved as .old  without this we end up not being able 
+# ssh in as iptables blocks access
+
+rename -v  .old "" /etc/sysconfig/*old
+
+echo -n "Create cloud-user"
+useradd cloud-user
+echo -e 'cloud-user\tALL=(ALL)\tNOPASSWD: ALL' >> /etc/sudoers
+sed -i -e "s/^\([[:blank:]]*user:[[:blank:]]*\)ec2-user$/\1cloud-user/" /etc/cloud/cloud.cfg
+
+cat > /etc/cloud/cloud.cfg.d/01_ec2.cfg <<EOF
+datasource:
+ Ec2:
+  timeout : 2
+  max_wait : 120
+EOF
+
+
+echo -n "Network fixes"
+# remove persistant binding for eth0
+rm -f /etc/udev/rules.d/70-persistent-net.rules
+echo "rm -f /etc/udev/rules.d/70-persistent-net.rules" >> /etc/rc.local
+
+# enable dhcpv6
+cat > /etc/sysconfig/network-scripts/ifcfg-eth0 << EOF
+DEVICE=eth0
+TYPE=Ethernet
+ONBOOT=yes
+BOOTPROTO=dhcp
+IPV6INIT=yes
+NETWORKING_IPV6=yes
+DHCPV6C=yes
+#DHCPV6C_OPTIONS=
+DHCLIENTARGS=-nw
+EOF
+
+# cloud-init needs to wait for IP
+cat > /etc/sysconfig/network << EOF
+NETWORKING=yes
+NETWORKWAIT=
+EOF
+
+# lock root
+passwd -l root
+
+
+printf '#!/bin/sh\nPIDFILE="$(mktemp)"\nCLEAN=\ncleanup() {\n if [ -z "$CLEAN" ]; then\n\tkill `cat "$PIDFILE"` 2>/dev/null\n\trm -f "$PIDFILE"\n\tCLEAN=yes\n fi\n}\ntrap cleanup 0 1 2 15\n(ip -6 monitor address & echo $! > "$PIDFILE")|\n\tsed -n "s;^[[:digit:]]\+:\s\+\([[:alnum:]]\+\)\s\+inet6\s\+\([[:alnum:]:]\+\)/[[:digit:]]\+\s\+scope global[[:blank:]]*$;\\2 \\1;;ta;b;:a p;ekill \$(cat $PIDFILE)"' >/usr/bin/wait_for_ipv6_global_permanent
+chmod o+x /usr/bin/wait_for_ipv6_global_permanent
+ 
+cat << \EOF > /usr/sbin/ndisc_update
+#!/bin/sh
+IP= IFACE= MAC= EOPT= OUT=
+while true; do
+    IP=
+    case "${IP:=$1}" in
+	monitor)
+	    logger -t "ndisc_update[$$]" "Waiting for permanent IPv6 address..."
+	    O="$(wait_for_ipv6_global_permanent)"
+	    if [ -z "$O" ]; then
+		logger -t "ndisc_update[$$]" "ERROR: Monitor exit with no result"
+		exit 1
+	    else
+		set $O
+	    fi
+	    ;;
+	"")
+	    O="$(ip -6 -o a s scope global permanent|head -1|awk '{split($4,a,"/"); print a[1]" "$2}')"
+	    if [ -z "$O" ]; then
+		logger -t "ndisc_update[$$]" "No permanent IPv6 addresses found"
+		set "monitor"
+	    else
+		set $O
+	    fi
+	    ;;
+	-h|--help)
+	    echo "usage: $0 [monitor|{IPv6 address}] [interface] [mac]"
+	    exit 0
+	    ;;
+	*)
+	    break
+	    ;;
+    esac
+done
+IFACE="${2:-$(ip -6 -o a s|grep " $IP/"|cut -d" " -f2)}"
+IFACE="${IFACE:-eth0}"
+MAC="${3:-$(cat /sys/class/net/$IFACE/address)}"
+EOPT="${MAC:+src=\"$MAC\"}"
+MAC="${MAC:-auto}"
+if ndsend $IP $IFACE; then
+    logger -t "ndisc_update[$$]" "Unsolicited Neighbor Advertisement sent for $IP via $IFACE"
+else
+    logger -t "ndisc_update[$$]" "FAILED to send Unsolicited Neighbor Advertisement for $IP via $IFACE"
+fi
+EOF
+chmod o+x /usr/sbin/ndisc_update
+
+
+cat << \EOF > /usr/sbin/duid-uuid-update
+#!/bin/bash
+DUID_FILE="/var/lib/dhcpv6/dhcp6c_duid"
+ID="00 04 $(dmidecode -s system-uuid|sed -e s/-//g -e "s/\(..\)/\1 /g")"
+N="$(printf %02X $(echo $ID|wc -w))"
+REC="$(echo $N 00 $ID|tr [:lower:] [:upper:])"
+CUR="$(echo $(od -A n -t x1 "$DUID_FILE"|tr [:lower:] [:upper:]))"
+[ "$CUR" = "$REC" ] && exit 0
+for i in $REC; do
+ printf $(printf "\%03o" 0x$i)
+done > "$DUID_FILE"
+logger "DUID updated to $ID (was $CUR)"
+rm -f /var/lib/dhcpv6/client6.leases*
+EOF
+
+chmod a+x /usr/sbin/duid-uuid-update
+
+useradd -c 'IPv4LL daemon' -u 71 -s /sbin/nologin -r -d '/' avahi-autoipd
+
+cat << \EOF > /etc/rc.d/init.d/avahi-autoipd
+#!/bin/sh
+#
+# avahi-autoipd:   IPv4LL daemon
+#
+# chkconfig: 2345 09 89
+# description:  This is a daemon for automatically configure link local IPv4 address
+#
+# processname: avahi-autoipd
+#
+### BEGIN INIT INFO
+# Provides: avahi_autoipd $ipv4ll
+# Default-Start: 2 3 4 5
+# Default-Stop: 0 1 6
+# Short-Description: start and stop avahi-autoipd
+# Description: avahi_autoipd is IPv4LL daemon
+### END INIT INFO
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+# Source network configuration
+. /etc/sysconfig/network
+
+prog=avahi-autoipd
+
+RETVAL=0
+
+start()
+{
+    echo -n $"DUID Update  "
+    /usr/sbin/duid-uuid-update
+    echo
+
+    echo $"NDISC Update  "
+    /usr/sbin/ndisc_update >/dev/null 2>&1 &
+    #(wait_for_ipv6_global_permanent && ip -6 route del default dev eth0) >/dev/null 2>&1 &
+    echo
+
+    echo -n $"Starting IPv4LL daemon: "
+    daemon $prog -D eth0:avahi
+    RETVAL=$?
+    echo
+    [ $RETVAL -eq 0 ] && touch /var/lock/subsys/$prog
+}
+
+stop()
+{
+    echo -n $"Stopping IPv4LL daemon: "
+    killproc $prog
+    RETVAL=$?
+    echo
+    if [ $RETVAL -eq 0 ]; then
+    rm -f /var/lock/subsys/$prog
+    fi
+}
+
+# See how we were called.
+case "$1" in
+    start)
+    start
+    ;;
+    stop)
+    stop
+    ;;
+    status)
+    status $prog
+    RETVAL=$?
+    ;;
+    restart)
+    stop
+    start
+    ;;
+    condrestart)
+    if [ -f /var/lock/subsys/$prog ]; then
+        stop
+        start
+    fi
+    ;;
+    *)
+    echo $"Usage: $0 {start|stop|status|restart|condrestart}"
+    ;;
+esac
+exit $RETVAL
+EOF
+
+chmod a+x /etc/rc.d/init.d/avahi-autoipd
+chkconfig --add avahi-autoipd
+
+
+echo "request subnet-mask, broadcast-address, time-offset, routers, domain-name, domain-search, domain-name-servers, ntp-servers , interface-mtu;" >> /etc/dhcp/dhclient-eth0.conf
+
+# put a message on the console
+cat << EOF >> /etc/issue
+Please note: By default it is not possible to login at this terminal. The system
+initially configured for SSH access only. Moreover, a single ssh key - the one
+specified at run time could be used to connect to this machine. To access this
+system, please run SSH client, choose correct SSH private key and specify
+username "cloud-user".
+
+The above notice might not be true if the configuration of the system has been
+altered by the administrator of this machine. In later case please consider to
+remove this message from /etc/issue file.
+
+EOF
