@@ -4,11 +4,10 @@ lang en_US.UTF-8
 keyboard us
 timezone --utc Europe/Moscow
 auth --useshadow --enablemd5
-selinux --enforcing
+selinux --disabled
 firewall --service=ssh
 network --bootproto=dhcp --device=eth0 --onboot=on
-#services --disabled network,wpa_supplicant,ip6tables,iptables --enabled=NetworkManager,sshd,cloud-init,rsyslog,ntpdate,ntpd
-services --disabled NetworkManager,wpa_supplicant,ip6tables,iptables --enabled=network,sshd,cloud-init,rsyslog,ntpdate,ntpd
+services --disabled ip6tables,iptables --enabled=network,sshd,cloud-init,rsyslog,ntpdate,ntpd
 
 text
 poweroff
@@ -20,7 +19,6 @@ ignoredisk --only-use=vda
 clearpart --all --drives=vda
 zerombr
 bootloader --location=mbr --driveorder=vda --append="console=ttyS0,115200n8 console=tty0"
-
 part / --asprimary --fstype="ext4" --size=999 --label=root --grow
 
 #
@@ -61,14 +59,15 @@ openssh-clients
 openssh-server
 curl
 sudo
+man
 
 #Allow for dhcp access
 dhclient
 iputils
 scapy
+bc
+ndisc6
 
-# Dual-stack init is much better with NM
-NetworkManager
 avahi-autoipd
 ntp
 ntpdate
@@ -82,6 +81,7 @@ epel-release
 
 -firstboot
 -biosdevname
+-NetworkManager
 
 %end
 
@@ -93,11 +93,16 @@ epel-release
 
 rename -v  .old "" /etc/sysconfig/*old
 
+# lock root
+passwd -l root
+
 echo -n "Create cloud-user"
 useradd cloud-user
 echo -e 'cloud-user\tALL=(ALL)\tNOPASSWD: ALL' >> /etc/sudoers
 sed -i -e "s/^\([[:blank:]]\+name:[[:blank:]]\+\)cloud-user$/\1cloud-user/" /etc/cloud/cloud.cfg
-#sed -i -e "s/^\([[:blank:]]*user:[[:blank:]]*\)ec2-user$/\1cloud-user/" /etc/cloud/cloud.cfg
+
+echo -n  "Enable cloud-config yum repo and package management"
+sed -i "/^[[:blank:]]\+- disable-ec2-metadata/ i \ - yum_add_repo\n - package_update_upgrade_install" /etc/cloud/cloud.cfg
 
 cat > /etc/cloud/cloud.cfg.d/01_ec2.cfg <<EOF
 datasource:
@@ -106,11 +111,12 @@ datasource:
   max_wait : 120
 EOF
 
-
 echo -n "Network fixes"
 # remove persistant binding for eth0
 rm -f /etc/udev/rules.d/70-persistent-net.rules
 echo "rm -f /etc/udev/rules.d/70-persistent-net.rules" >> /etc/rc.local
+
+echo "request subnet-mask, broadcast-address, time-offset, routers, domain-name, domain-search, domain-name-servers, ntp-servers , interface-mtu;" >> /etc/dhcp/dhclient-eth0.conf
 
 # enable dhcpv6
 cat > /etc/sysconfig/network-scripts/ifcfg-eth0 << EOF
@@ -129,38 +135,6 @@ cat > /etc/sysconfig/network << EOF
 NETWORKING=yes
 NETWORKWAIT=
 EOF
-
-# lock root
-passwd -l root
-
-
-printf '#!/bin/sh\nPIDFILE="$(mktemp)"\nCLEAN=\ncleanup() {\n if [ -z "$CLEAN" ]; then\n\tkill `cat "$PIDFILE"` 2>/dev/null\n\trm -f "$PIDFILE"\n\tCLEAN=yes\n fi\n}\ntrap cleanup 0 1 2 15\n(ip -6 monitor address & echo $! > "$PIDFILE")|\n\tsed -n "s;^[[:digit:]]\+:\s\+\([[:alnum:]]\+\)\s\+inet6\s\+\([[:alnum:]:]\+\)/[[:digit:]]\+\s\+scope global[[:blank:]]*$;\\2 \\1;;ta;b;:a p;ekill \$(cat $PIDFILE)"' >/usr/bin/wait_for_ipv6_global_permanent
-chmod o+x /usr/bin/wait_for_ipv6_global_permanent
- 
-printf '#!/bin/sh\nIP= IFACE= MAC= EOPT= OUT=\nwhile true; do\n\tIP=\n\tcase "${IP:=$1}" in\n\t\tmonitor)\n\t\t\tlogger -t "ndisc_update[$$]" "Waiting for permanent IPv6 address..."\n\t\t\tO="$(wait_for_ipv6_global_permanent)"\n\t\t\tif [ -z "$O" ]; then\n\t\t\t\tlogger -t "ndisc_update[$$]" "ERROR: Monitor exit with no result"\n\t\t\t\texit 1\n\t\t\telse\n\t\t\t\tset $O\n\t\t\tfi\n\t\t\t;;\n\t\t"")\n\t\t\tO="$(ip -6 -o a s scope global permanent|head -1|awk '"'"'{split($4,a,"/"); print a[1]" "$2}'"'"')"\n\t\t\tif [ -z "$O" ]; then\n\t\t\t\tlogger -t "ndisc_update[$$]" "No permanent IPv6 addresses found"\n\t\t\t\tset "monitor"\n\t\t\telse\n\t\t\t\tset $O\n\t\t\tfi\n\t\t\t;;\n\t\t-h|--help)\n\t\t\techo "usage: $0 [monitor|{IPv6 address}] [interface] [mac]"\n\t\t\texit 0\n\t\t\t;;\n\t\t*)\n\t\t\tbreak\n\t\t\t;;\n\tesac\ndone\nIFACE="${2:-$(ip -6 -o a s|grep " $IP/"|cut -d" " -f2)}"\nIFACE="${IFACE:-eth0}"\nMAC="${3:-$(cat /sys/class/net/$IFACE/address)}"\nEOPT="${MAC:+src=\\"$MAC\\"}"\nMAC="${MAC:-auto}"\n'"echo 'a=Ether('\$EOPT')/IPv6()/ICMPv6ND_NA(tgt=\"'\$IP'\",R=0);sendp(a/ICMPv6NDOptDstLLAddr(lladdr=a.src),iface=\"'\$IFACE'\")'|\n"' if OUT="$(scapy 2>&1)"; echo "$OUT"|grep ^Sent >/dev/null; then\n\tlogger -t "ndisc_update[$$]" "Unsolicited Neighbor Advertisement sent for $IP with mac $MAC via $IFACE"\n else\n\techo "$@\\n$OUT\\n"|sed "s/[^[:print:]]*//g"\n fi\n' > /usr/sbin/ndisc_update
-chmod o+x /usr/sbin/ndisc_update
-
-printf '#!/bin/bash\nIFACE=${1:-eth0}\nLEASE=${2:-/var/lib/dhcp/dhclient6.$IFACE.leases}\n\nduid="default-duid \\"\\000\\004"\nfor i in `sed -e s/-//g -e "s/\(..\)/\\1 /g" /sys/devices/virtual/dmi/id/product_uuid`; do\n num=`printf "%%d" 0x$i`\n octnum=`printf "\\%%03o" 0x$i`\n if [ $num -lt 127 -a $num -gt 31 ]; then\n  octnum=`printf $octnum`\n fi\n duid=$duid$octnum\ndone\nduid="$duid\\";"\n\nif [ "$(head -1 $LEASE)" != "$duid" ]; then\n echo "$duid" > $LEASE\nfi\n' >/usr/sbin/duid-uuid-update
-chmod a+x /usr/sbin/duid-uuid-update
-
-cat << \EOF > /etc/NetworkManager/NetworkManager.conf 
-[main]
-plugins=keyfile
-EOF
-
-cat << \EOF > /etc/NetworkManager/system-connections/eth0 
-[connection]
-id=eth0
-uuid=4929951a-86d6-4298-b053-f9cecfca7c1c
-type=802-3-ethernet
-
-[ipv4]
-method=auto
-
-[ipv6]
-method=dhcp
-EOF
-chmod 600 /etc/NetworkManager/system-connections/eth0
 
 cat << \EOF > /etc/rc.d/init.d/avahi-autoipd
 #!/bin/sh
@@ -193,14 +167,11 @@ RETVAL=0
 start()
 {
     echo -n $"DUID Update  "
-    /usr/sbin/duid-uuid-update eth0 /var/lib/dhclient/dhclient6-4929951a-86d6-4298-b053-f9cecfca7c1c-eth0.lease
-    /usr/sbin/duid-uuid-update eth0 /var/lib/dhclient/dhclient6-eth0.leases
-    /usr/sbin/duid-uuid-update eth0 /var/lib/dhclient/dhclient6.leases
+    /usr/sbin/duid-uuid-update
     echo
 
     echo $"NDISC Update  "
-    /usr/sbin/ndisc_update >/dev/null 2>&1 &
-    #(wait_for_ipv6_global_permanent && ip -6 route del default dev eth0) >/dev/null 2>&1 &
+    /usr/sbin/ndisc_update 2>&1 &
     echo
 
     echo -n $"Starting IPv4LL daemon: "
@@ -253,9 +224,6 @@ EOF
 chmod a+x /etc/rc.d/init.d/avahi-autoipd
 chkconfig --add avahi-autoipd
 
-
-echo "request subnet-mask, broadcast-address, time-offset, routers, domain-name, domain-search, domain-name-servers, ntp-servers , interface-mtu;" >> /etc/dhcp/dhclient-eth0.conf
-
 # put a message on the console
 cat << EOF >> /etc/issue
 Please note: By default it is not possible to login at this terminal. The system
@@ -281,5 +249,46 @@ gpgcheck=1
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
 EOF
 done
+
+base64 --decode <<< IyEvdXNyL2Jpbi9lbnYgYmFzaApleHBvcnQgUEFUSD0kUEFUSDovdXNyL2xvY2FsL3NiaW46L3Vzci9sb2NhbC9iaW4KCk1FPSR7MCMjKi99Cgptc2coKXsKCWVjaG8gIiQxIgoJbG9nZ2VyIC10ICIke01FfVskJF0iICIkMSIKfQoKaXB2Nl9oZXgoKXsKICBsb2NhbCBpcCBuPQogIGxvY2FsIC1hIHF1YWQKICAgaXA9JDEKICAgIElGUz0nOicgcmVhZCAtcmEgcXVhZCA8PDwiJGlwIgogICAgZm9yIGkgaW4gJHshcXVhZFtAXX07IGRvCglpZiBbIC1uICIke3F1YWRbaV19IiBdOyB0aGVuCgkgICAgbj0iJG5gcHJpbnRmICIlMDR4IiAkKCgxNiMke3F1YWRbaV19KSlgIgoJZWxzZQoJICAgIG49IiRuYHByaW50ZiAiJTAkKCggKDgtJHsjcXVhZFtAXX0rMSkgKiA0ICkpeCJgIgoJZmkKICAgIGRvbmUKICAgIGVjaG8gJG4KfQoKaXB2Nl9leHBhbmRlZF9mcm9tX2hleCgpewogIGxvY2FsIGhleD0kMQogICAgZWNobyAkaGV4fHNlZCAtZSAicy9cKC5cezRcfVwpL1wxOi9nIiAtZSAicy86JC8vInx0ciAnWzp1cHBlcjpdJyAnWzpsb3dlcjpdJwp9CgppcHY2X2V4cGFuZCgpewogIGxvY2FsIGlwIGhleAogICBpcD0kMQogICAgaGV4PSQoaXB2Nl9oZXggJGlwKQogICAgZWNobyAkKGlwdjZfZXhwYW5kZWRfZnJvbV9oZXggJGhleCkKfQoKcGxlbl90b19tYXNrKCl7CiAgbG9jYWwgbWFza2xlbiBvY3RzIG9uZXMgemVyb3MgbQogICBtYXNrbGVuPSQxCiAgICBvY3RzPSQoKG1hc2tsZW4vNCkpCiAgICBvbmVzPSQoIHByaW50ZiAiJSR7cGxlbn1zIiAnICcgKQogICAgemVyb3M9JCggcHJpbnRmICIlJCgobWFza2xlbi1wbGVuKSlzIiAnICcgKSAjIgogICAgbT0ke29uZXMvLyAvMX0ke3plcm9zLy8gLzB9CiAgICBlY2hvICJpYmFzZT0yO29iYXNlPTEwMDAwOyRtInxiYwp9CgppcHY2X21hc2tlZF9hZGRyKCl7CiAgbG9jYWwgaXAgcGxlbiBpbmMgbiBtYXNrIG1hc2tlZCBpbmNlZAogICBpcD0kMQogICBwbGVuPSQyCiAgIGluYz0kezM6LTF9CiAgICBuPSQoaXB2Nl9oZXggJGlwKQogICAgbWFzaz0kKHBsZW5fdG9fbWFzayAxMjggJHBsZW4pCiAgICBtYXNrZWQ9JChwcmludGYgIiUwMTZ4JTAxNnhcbiIgJCgoMTYjJHtuOjA6MTZ9ICYgMTYjJHttYXNrOjA6MTZ9KSkgJCgoMTYjJHtuOjE2OjMyfSAmIDE2IyR7bWFzazoxNjozMn0pKXx0ciAnWzpsb3dlcjpdJyAnWzp1cHBlcjpdJykKICAgIGluY2VkPSQoZWNobyAib2Jhc2U9MTY7aWJhc2U9MTY7JG1hc2tlZCArICRpbmMifGJjKQogICAgZWNobyAkKGlwdjZfZXhwYW5kZWRfZnJvbV9oZXggJGluY2VkKQp9CgpJUD0gSUZBQ0U9IE1BQz0gRU9QVD0gT1VUPQp3aGlsZSB0cnVlOyBkbwoJSVA9CgljYXNlICIke0lQOj0kMX0iIGluCgkJbW9uaXRvcikKCQkJbXNnICJXYWl0aW5nIGZvciBwZXJtYW5lbnQgSVB2NiBhZGRyZXNzLi4uIgoJCQlPPSIkKGlwdjZfd2FpdF9mb3JfZ2xvYmFsX3Blcm1hbmVudCkiCgkJCWlmIFsgLXogIiRPIiBdOyB0aGVuCgkJCQltc2cgIkVSUk9SOiBNb25pdG9yIGV4aXQgd2l0aCBubyByZXN1bHQiCgkJCQlleGl0IDEKCQkJZWxzZQoJCQkJc2V0ICRPCgkJCWZpCgkJCTs7CgkJIiIpCgkJCU89IiQoaXB2Nl9nZXRfZ2xvYmFsX3Blcm1hbmVudCkiCgkJCWlmIFsgLXogIiRPIiBdOyB0aGVuCgkJCQltc2cgIk5vIHBlcm1hbmVudCBJUHY2IGFkZHJlc3NlcyBmb3VuZCIKCQkJCXNldCAibW9uaXRvciIKCQkJZWxzZQoJCQkJc2V0ICRPCgkJCWZpCgkJCTs7CgkJLWh8LS1oZWxwKQoJCQllY2hvICJ1c2FnZTogJDAgW21vbml0b3J8e0lQdjYgYWRkcmVzc31dIFtpbnRlcmZhY2VdIFttYWNdIgoJCQlleGl0IDAKCQkJOzsKCQkqKQoJCQlicmVhawoJCQk7OwoJZXNhYwpkb25lCklGQUNFPSIkezI6LSQoaXB2Nl9nZXRfaWZhY2VfYnlfaXAgJElQKX0iCklGQUNFPSIke0lGQUNFOi0kKGlwdjZfZ2V0X2RlZmF1bHRfaWZhY2UpfSIKTUFDPSIkezM6LSQoaXB2Nl9nZXRfbWFjX2J5X2lmYWNlICRJRkFDRSl9IgpJUExMPSIkKGlwdjZfZ2V0X2lwdjZsbF9ieV9pZmFjZSAkSUZBQ0UpIgpJUExMPSR7SVBMTCUlJSp9CklPUFQ9IiR7SVBMTDorc3JjPVwiJElQTExcIn0iCkVPUFQ9IiR7TUFDOitzcmM9XCIkTUFDXCJ9IgpNQUM9IiR7TUFDOi1hdXRvfSIKCgpOQV9TRU5ERVJTPQpTQ0FQWT0vb3B0L3NjYXB5LTIuMi4wL3J1bl9zY2FweQpmb3IgUyBpbiAkU0NBUFkgJCh3aGljaCBzY2FweSAyPi9kZXYvbnVsbCk7IGRvCglpZiBbIC14ICIkUyIgXTsgdGhlbgoJCVNDQVBZPSRTCgkJTkFfU0VOREVSUz0iJE5BX1NFTkRFUlMgc2VuZF9uYV91c2luZ19zY2FweSIKCWZpCmRvbmUKCk5EU0VORD0kKHdoaWNoIG5kc2VuZCAyPi9kZXYvbnVsbCkKaWYgWyAteCAiJE5EU0VORCIgXTsgdGhlbgoJTkFfU0VOREVSUz0iJE5BX1NFTkRFUlMgc2VuZF9uYV91c2luZ19uZHNlbmQiCmZpCgpzZW5kX25hX3VzaW5nX3NjYXB5KCl7CiBlY2hvICdhPUV0aGVyKCckRU9QVCcpL0lQdjYoJyRJT1BUJykvSUNNUHY2TkRfTkEodGd0PSInJElQJyIsUj0wKTtzZW5kcChhL0lDTVB2Nk5ET3B0RHN0TExBZGRyKGxsYWRkcj1hLnNyYyksaWZhY2U9IickSUZBQ0UnIiknfAogaWYgT1VUPSIkKCRTQ0FQWSAyPiYxKSI7IGVjaG8gIiRPVVQifGdyZXAgXlNlbnQgPi9kZXYvbnVsbDsgdGhlbgoJcmV0dXJuIDAKIGVsc2UKCWVjaG8gIiRAXG4kT1VUXG4ifHNlZCAicy9bXls6cHJpbnQ6XV0qLy9nIiA+JjIKCXJldHVybiAxCiBmaQp9CgpzZW5kX25hX3VzaW5nX25kc2VuZCgpewogJE5EU0VORCAkSVAgJElGQUNFCn0KCmZvciBzZW5kZXIgaW4gJE5BX1NFTkRFUlM7IGRvCglpZiAkc2VuZGVyOyB0aGVuCgkJbXNnICJVbnNvbGljaXRlZCBOZWlnaGJvciBBZHZlcnRpc2VtZW50IHNlbnQgZm9yICRJUCB3aXRoIG1hYyAkTUFDIHZpYSAkSUZBQ0UgZnJvbSAkSVBMTCIKCQlicmVhawoJZmkKZG9uZQoKbXNnICJTZXR0aW5nICRJUCBwcmVmZmVyZWQiCm1zZyAiJChpcHY2X3NldF9wcmVmZmVyZWQgJElQKSIKCmlwdjZfZ2V0X29ubGlua19wcmVmaXhlcyAkSUZBQ0V8d2hpbGUgSUZTPS8gcmVhZCBuZXQgbGVuOyBkbwoJYWRkcl9tYXNrZWQ9JChpcHY2X21hc2tlZF9hZGRyICRJUCAkbGVuIDApCglhZGRyX25ldD0kKGlwdjZfZXhwYW5kICRuZXQpCglpZiBbICIkYWRkcl9tYXNrZWQiID0gIiRhZGRyX25ldCIgXTsgdGhlbgoJCWZvciB0YXJnZXQgaW4gJGFkZHJfbWFza2VkICQoaXB2Nl9tYXNrZWRfYWRkciAkSVAgJGxlbiAxKTsgZG8KCQkJaWYgcGluZzYgLWMxICR0YXJnZXQgPi9kZXYvbnVsbDsgdGhlbgoJCQkJbXNnICJUYXJnZXQgJHRhcmdldCBwaW5nZWQgT0siCgkJCWVsc2UKCQkJCW1zZyAiRVJST1I6IENvdWxkIG5vdCBwaW5nICR0YXJnZXQiCgkJCWZpCgkJZG9uZQoJZmkKZG9uZQo= >/usr/sbin/ndisc_update
+chmod a+x /usr/sbin/ndisc_update
+
+base64 --decode <<< IyEvdXNyL2Jpbi9lbnYgYmFzaApleHBvcnQgUEFUSD0kUEFUSDovdXNyL2xvY2FsL3NiaW46L3Vzci9sb2NhbC9iaW4KCk1FPSR7MCMjKi99Cgptc2coKXsKICAgIGVjaG8gIiQxIgogICAgbG9nZ2VyIC10ICIke01FfVskJF0iICIkMSIKfQoKSUZBQ0U9IiR7MTotJChpcHY2X2dldF9kZWZhdWx0X2lmYWNlKX0iCgpMRUFTRVM9IgpkdWlkX2RoY2xpZW50CS92YXIvbGliL2RoY2xpZW50L2RoY2xpZW50Ni00OTI5OTUxYS04NmQ2LTQyOTgtYjA1My1mOWNlY2ZjYTdjMWMtSUZBQ0UubGVhc2UKZHVpZF9kaGNsaWVudAkvdmFyL2xpYi9kaGNsaWVudC9kaGNsaWVudDYtSUZBQ0UubGVhc2VzCmR1aWRfZGhjbGllbnQJL3Zhci9saWIvZGhjbGllbnQvZGhjbGllbnQ2LmxlYXNlcwpkdWlkX2RoY2xpZW50CS92YXIvbGliL2RoY3AvZGhjbGllbnQ2LklGQUNFLmxlYXNlcwpkdWlkX2RoY2xpZW50CS92YXIvbGliL2RoY3AvZGhjbGllbnQ2LmxlYXNlcwpkdWlkX2RoY3B2NgkvdmFyL2xpYi9kaGNwdjYvY2xpZW50Ni5sZWFzZXMgL3Zhci9saWIvZGhjcHY2L2RoY3A2Y19kdWlkCiIKCmR1aWRfZGhjbGllbnQoKXsKIGxvY2FsIGxlYXNlX2ZpbGU9IiQxIgogICAgZHVpZD0iZGVmYXVsdC1kdWlkIFwiXDAwMFwwMDQiCiAgICBmb3IgaSBpbiBgZG1pZGVjb2RlIC1zIHN5c3RlbS11dWlkfHNlZCAtZSBzLy0vL2cgLWUgInMvXCguLlwpL1wxIC9nImA7IGRvCgludW09YHByaW50ZiAiJWQiIDB4JGlgCglvY3RudW09YHByaW50ZiAiXCUwM28iIDB4JGlgCglpZiBbICRudW0gLWx0IDEyNyAtYSAkbnVtIC1ndCAzMSBdOyB0aGVuCgkgICAgb2N0bnVtPWBwcmludGYgJG9jdG51bWAKCWZpCglkdWlkPSRkdWlkJG9jdG51bQogICAgZG9uZQogICAgZHVpZD0iJGR1aWRcIjsiCgogICAgaWYgWyAiJChoZWFkIC0xICRsZWFzZV9maWxlIDI+L2Rldi9udWxsKSIgIT0gIiRkdWlkIiBdOyB0aGVuCiAgICBlY2hvICIkZHVpZCIgPiAkbGVhc2VfZmlsZQogICAgZmkKfQoKZHVpZF9kaGNwdjYoKXsKIGxvY2FsIGxlYXNlX2ZpbGU9IiQxIgogbG9jYWwgZHVpZF9maWxlPSIkMiIKICAgIElEPSIwMCAwNCAkKGRtaWRlY29kZSAtcyBzeXN0ZW0tdXVpZHxzZWQgLWUgcy8tLy9nIC1lICJzL1woLi5cKS9cMSAvZyIpIiAjIgogICAgTj0iJChwcmludGYgJTAyWCAkKGVjaG8gJElEfHdjIC13KSkiCiAgICBSRUM9IiQoZWNobyAkTiAwMCAkSUR8dHIgWzpsb3dlcjpdIFs6dXBwZXI6XSkiCiAgICBDVVI9IiQoZWNobyAkKG9kIC1BIG4gLXQgeDEgIiRkdWlkX2ZpbGUifHRyIFs6bG93ZXI6XSBbOnVwcGVyOl0pKSIKICAgIGlmIFsgIiRDVVIiID0gIiRSRUMiIF07IHRoZW4KICAgICAgICBlY2hvICJEVUlEIGlzIHRoZSBzYW1lLiBMZWF2aW5nIGxlYXNlIGZpbGUuIgogICAgICAgIHJldHVybiAwCiAgICBmaQogICAgZm9yIGkgaW4gJFJFQzsgZG8KICAgICAgICBwcmludGYgJChwcmludGYgIlwlMDNvIiAweCRpKQogICAgZG9uZSA+ICIkZHVpZF9maWxlIgogICAgbXNnICJEVUlEIHVwZGF0ZWQgdG8gJElEICh3YXMgJENVUikiCiAgICBybSAtZiAiJGxlYXNlX2ZpbGUiCn0KCndoaWxlIHJlYWQgdXBkYXRlciBsZWFzZV9maWxlIGR1aWRfZmlsZTsgZG8KICAgIGlmIFsgLWQgIiR7bGVhc2VfZmlsZSUvKn0iIF07IHRoZW4KCW1zZyAiUHJvY2Vzc2luZyAkdXBkYXRlcjogJGxlYXNlX2ZpbGUiCgkkdXBkYXRlciAiJGxlYXNlX2ZpbGUiICIkZHVpZF9maWxlIgogICAgZmkKZG9uZSA8PCBFT0YKJChlY2hvICIkTEVBU0VTInxzZWQgInMvSUZBQ0UvJElGQUNFL2ciKQpFT0YK >/usr/sbin/duid-uuid-update
+chmod a+x /usr/sbin/duid-uuid-update
+
+base64 --decode <<< aXAgLTYgLW8gYSBzIHNjb3BlIGdsb2JhbCBwZXJtYW5lbnR8aGVhZCAtMXxhd2sgJ3tzcGxpdCgkNCxhLCIvIik7IHByaW50IGFbMV0iICIkMn0nCg== >/usr/sbin/ipv6_get_global_permanent
+chmod a+x /usr/sbin/ipv6_get_global_permanent
+
+base64 --decode <<< SVA9JDEKaWYgWyAteiAiJElQIiBdOyB0aGVuCiBlY2hvICJFUlJPUjogc3BlY2lmeSBJUHY2IGFkZHJlc3MiID4mMgogZXhpdCAxCmZpCmlmIGlwIC02IHIgZyAyYTAyOjp8Z3JlcCAic3JjICRJUCIgPi9kZXYvbnVsbDsgdGhlbgoJZWNobyAkMSBhbHJlYWR5IHByZWZmZXJlZAplbHNlCglJRkFDRT0iJHsyOi0kKGlwdjZfZ2V0X2lmYWNlX2J5X2lwICRJUCl9IgkKCWlmIFsgLXogIiRJRkFDRSIgXTsgdGhlbgoJCWVjaG8gIkVSUk9SOiBpbnRlcmZhY2Ugbm90IGZvdW5kIGZvciAkSVAiID4mMgoJCWV4aXQgMgoJZmkKCWVjaG8gInNldHRpbmcgJDEgcHJlZmZlcmVkIG5vdCB5ZXQgc3VwcG9ydGVkIgpmaQo= >/usr/sbin/ipv6_set_preffered
+chmod a+x /usr/sbin/ipv6_set_preffered
+
+base64 --decode <<< aXAgLTYgLW8gYSBzfGdyZXAgIiAkMS8ifGN1dCAtZCIgIiAtZjIK >/usr/sbin/ipv6_get_iface_by_ip
+chmod a+x /usr/sbin/ipv6_get_iface_by_ip
+
+base64 --decode <<< IyEvYmluL3NoClsgLXogIiQxIiBdICYmIGV4aXQKaXAgLTYgYSBsIGRldiAkMSBzY29wZSBsaW5rfGF3ayAne2lmKCQxPT0iaW5ldDYiKXByaW50ICQyfSd8YXdrIC1GLyAne3ByaW50ICQxfSd8aGVhZCAtMQo= >/usr/sbin/ipv6_get_ipv6ll_by_iface
+chmod a+x /usr/sbin/ipv6_get_ipv6ll_by_iface
+
+base64 --decode <<< SUZBQ0U9JHsxOi0kKGlwdjZfZ2V0X2RlZmF1bHRfaWZhY2UpfQppcCAtNiByb3V0ZSBsaXN0IGRldiAkSUZBQ0V8YXdrICckMX4iLyIgJiYgJDEhfiJeZmU4MDoiIHtwcmludCAkMX0nCgo= >/usr/sbin/ipv6_get_onlink_prefixes
+chmod a+x /usr/sbin/ipv6_get_onlink_prefixes
+
+base64 --decode <<< Y2F0IC9zeXMvY2xhc3MvbmV0LyQxL2FkZHJlc3MK >/usr/sbin/ipv6_get_mac_by_iface
+chmod a+x /usr/sbin/ipv6_get_mac_by_iface
+
+base64 --decode <<< ZWNobyBldGgwCg== >/usr/sbin/ipv6_get_default_iface
+chmod a+x /usr/sbin/ipv6_get_default_iface
+
+base64 --decode <<< IyEvYmluL3NoClBJREZJTEU9IiQobWt0ZW1wKSIKQ0xFQU49CmNsZWFudXAoKSB7CiBpZiBbIC16ICIkQ0xFQU4iIF07IHRoZW4KCWtpbGwgYGNhdCAiJFBJREZJTEUiYCAyPi9kZXYvbnVsbAoJcm0gLWYgIiRQSURGSUxFIgoJQ0xFQU49eWVzCiBmaQp9CnRyYXAgY2xlYW51cCAwIDEgMiAxNQooaXAgLTYgbW9uaXRvciBhZGRyZXNzICYgZWNobyAkISA+ICIkUElERklMRSIpfAoJc2VkIC1uICJzO15bWzpkaWdpdDpdXVwrOlxzXCtcKFtbOmFsbnVtOl1dXCtcKVxzXCtpbmV0NlxzXCtcKFtbOmFsbnVtOl06XVwrXCkvW1s6ZGlnaXQ6XV1cK1xzXCtzY29wZSBnbG9iYWxbWzpibGFuazpdXSokO1wyIFwxOzt0YTtiOzphIHA7ZWtpbGwgXCQoY2F0ICRQSURGSUxFKSI= >/usr/sbin/ipv6_wait_for_global_permanent
+chmod a+x /usr/sbin/ipv6_wait_for_global_permanent
+
+# HACK - remove me
+echo "net.ipv6.conf.eth0.dad_transmits = 0" >>/etc/sysctl.conf
+echo "net.ipv6.conf.eth0.optimistic_dad = 1" >>/etc/sysctl.conf
+#sed -i "s/^tmpfs.*/#$/" /etc/fstab
+
+echo "Zeroing out empty space."
+# This forces the filesystem to reclaim space from deleted files
+dd bs=1M if=/dev/zero of=/var/tmp/zeros || :
+rm -f /var/tmp/zeros
+echo "(Don't worry -- that out-of-space error was expected.)"
 
 %end
