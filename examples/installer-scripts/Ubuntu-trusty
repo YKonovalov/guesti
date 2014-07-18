@@ -87,7 +87,7 @@ d-i base-installer/kernel/image string linux-image-virtual
 d-i grub-installer/timeout string 1
 d-i debian-installer/quiet boolean false
 d-i debian-installer/splash boolean false
-d-i debian-installer/add-kernel-opts string console=ttyS0,115200n8 console=tty0
+d-i debian-installer/add-kernel-opts string console=ttyS0,115200n8 console=tty0 apparmor=0
 
 d-i debian-installer/exit/poweroff boolean true
 d-i finish-install/reboot_in_progress note
@@ -97,7 +97,9 @@ tmpreaper tmpreaper/readsecurity_upgrading note
 
 # Clear network iface mapping; force network to wait for dhcp before cloud-init
 d-i preseed/late_command string \
-    in-target dpkg -r language-pack-gnome-en language-pack-gnome-en-base; \
+    in-target invoke-rc.d apparmor kill; \
+    in-target update-rc.d -f apparmor remove; \
+    in-target dpkg -r language-pack-gnome-en language-pack-gnome-en-base apparmor; \
     in-target rm -f /etc/udev/rules.d/70-persistent-net.rules; \
     in-target sed -i '$ a cloud-user ALL=(ALL) NOPASSWD: ALL' /etc/sudoers; \
     in-target sed -i 's/^\([[:blank:]]\+name:[[:blank:]]\+\)ubuntu$/\1cloud-user/' /etc/cloud/cloud.cfg; \
