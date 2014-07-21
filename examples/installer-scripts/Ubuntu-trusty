@@ -70,7 +70,7 @@ d-i apt-setup/backports boolean true
 d-i apt-setup/services-select multiselect
 
 tasksel tasksel/first multiselect ssh-server
-d-i pkgsel/install-language-support boolean false
+#d-i pkgsel/install-language-support boolean false
 d-i pkgsel/include string linux-virtual openssh-server \
     cloud-init cloud-initramfs-growroot cloud-initramfs-rescuevol \
     vim mc byobu screen tmux w3m man \
