@@ -88,7 +88,7 @@ d-i base-installer/kernel/image string linux-image-virtual
 d-i grub-installer/timeout string 1
 d-i debian-installer/quiet boolean false
 d-i debian-installer/splash boolean false
-d-i debian-installer/add-kernel-opts string console=ttyS0,115200n8 console=tty0 apparmor=0
+d-i debian-installer/add-kernel-opts string console=ttyS0,115200n8 apparmor=0
 
 d-i debian-installer/exit/poweroff boolean true
 d-i finish-install/reboot_in_progress note
@@ -108,21 +108,24 @@ d-i preseed/late_command string \
     in-target sed -i 's;^\([[:blank:]]\+security:[[:blank:]]\+\)http://security.*$;\1http://mirror.yandex.ru/ubuntu;' /etc/cloud/cloud.cfg; \
     in-target sed -i 's;^\([[:blank:]-]\+\)http:.*$;\1http://mirror.yandex.ru/ubuntu/;' /etc/cloud/cloud.cfg; \
     in-target sed -i "/^preserve_hostname:/ a manage_etc_hosts: false\napt_preserve_sources_list: true\n" /etc/cloud/cloud.cfg; \
+    in-target sed -i '/^exit 0/ i /usr/sbin/ndisc_update' /etc/rc.local ;\
+    printf '[ "$reason" = "BOUND6" ] && /usr/sbin/ndisc_update $new_ip6_address $interface\n' > /target/etc/dhcp/dhclient-exit-hooks.d/ndsend; \
+    printf '# duid-uuid-update - update DHCPv6 DUID to the type DUID-UUID from system GUID\n\ndescription "update DHCPv6 DUID"\n\nstart on mounted MOUNTPOINT=/\n\ntask\nconsole output\n\nexec duid-uuid-update\n' >/target/etc/init/duid-uuid-update.conf; \
     sed "/^127.0.0.1[[:blank:]]\+localhost/! s/^\(127.0.\(1\|0\).1[[:blank:]]\+\).*$/\1newborn/" /etc/hosts >/target/etc/hosts; \
+    sed -i "s/^\(net.ipv6.conf.\(all\|default\).use_tempaddr =\).*/\1 0/" /target/etc/sysctl.d/10-ipv6-privacy.conf; \
+    printf 'net.ipv6.conf.eth0.dad_transmits = 0\n' >>/target/etc/sysctl.conf; \
     printf "newborn\n" > /target/etc/hostname; \
     printf 'auto lo\niface lo inet loopback\n\n' > /target/etc/network/interfaces; \
     printf 'auto eth0\niface eth0 inet manual\n'   >> /target/etc/network/interfaces; \
-    printf ' up /usr/sbin/avahi-autoipd -D $IFACE:avahi\n'   >> /target/etc/network/interfaces; \
-    printf ' down /usr/sbin/avahi-autoipd --kill $IFACE:avahi\n'   >> /target/etc/network/interfaces; \
+    printf ' pre-up avahi-autoipd -D $IFACE:avahi\n'   >> /target/etc/network/interfaces; \
+    printf ' pre-down avahi-autoipd --kill $IFACE:avahi\n'   >> /target/etc/network/interfaces; \
+    printf ' up dhclient3 -nw -e IF_METRIC=100 -pf /var/run/dhclient.$IFACE.pid -lf /var/lib/dhcp/dhclient.$IFACE.leases $IFACE\n'   >> /target/etc/network/interfaces; \
+    printf ' down dhclient3 -r -pf /var/run/dhclient.$IFACE.pid -lf /var/lib/dhcp3/dhclient.$IFACE.leases $IFACE\n'   >> /target/etc/network/interfaces; \
     printf 'iface eth0 inet6 auto\n privext 0\n' >> /target/etc/network/interfaces; \
     printf 'iface eth0 inet6 manual\n'           >> /target/etc/network/interfaces; \
     printf ' up dhclient -6 -nw -pf /run/dhclient6.$IFACE.pid -lf /var/lib/dhcp/dhclient6.$IFACE.leases $IFACE\n' >> /target/etc/network/interfaces; \
     printf ' down dhclient -6 -r -pf /run/dhclient6.$IFACE.pid -lf /var/lib/dhcp/dhclient6.$IFACE.leases $IFACE\n' >> /target/etc/network/interfaces; \
-    printf ' pre-up /usr/sbin/duid-uuid-update $IFACE\n' >> /target/etc/network/interfaces; \
     printf "#pre-up rdisc6 -1 \$IFACE|grep '^Stateful address conf.\s*:\s*Yes\$'\n" >> /target/etc/network/interfaces; \
-    printf 'iface eth0 inet dhcp\n'   >> /target/etc/network/interfaces; \
-    printf '[ "$reason" = "BOUND6" ] && ndisc_update $new_ip6_address $interface\n' > /target/etc/dhcp/dhclient-exit-hooks.d/ndsend; \
-    sed -i "s/^\(net.ipv6.conf.\(all\|default\).use_tempaddr =\).*/\1 0/" /target/etc/sysctl.d/10-ipv6-privacy.conf; \
     printf 'tmpfs /tmp tmpfs noauto,optional,nodev,noexec,nosuid 0 0\n' >> /target/etc/fstab; \
     echo "Please note: By default it is not possible to login at this terminal. The system" >>/target/etc/issue ;\
     echo "initially configured for SSH access only. Moreover, a single ssh key - the one"   >>/target/etc/issue ;\

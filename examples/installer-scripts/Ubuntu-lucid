@@ -86,7 +86,7 @@ d-i base-installer/kernel/image string linux-image-virtual
 d-i grub-installer/timeout string 1
 d-i debian-installer/quiet boolean false
 d-i debian-installer/splash boolean false
-d-i debian-installer/add-kernel-opts string console=ttyS0,115200n8 console=tty0 apparmor=0
+d-i debian-installer/add-kernel-opts string console=ttyS0,115200n8 apparmor=0
 
 d-i debian-installer/exit/poweroff boolean true
 d-i finish-install/reboot_in_progress note
@@ -98,32 +98,27 @@ tmpreaper tmpreaper/readsecurity_upgrading note
 d-i preseed/late_command string \
     in-target invoke-rc.d apparmor kill; \
     in-target update-rc.d -f apparmor remove; \
-    in-target update-rc.d -f wide-dhcpv6-client remove; \
     in-target update-rc.d -f resolvconf remove; \
-    in-target update-rc.d resolvconf multiuser 13; \
     in-target dpkg -r language-pack-gnome-en language-pack-gnome-en-base apparmor apparmor-utils; \
     in-target rm -f /etc/udev/rules.d/70-persistent-net.rules; \
-    in-target sed -i 's/^[[:blank:]]\*\(linux.*\)[[:blank:]]\+quiet\(.*\)$/\1\2/g' /boot/grub/grub.cfg; \
+    in-target sed -i 's/^\([[:blank:]]\+linux.*\)[[:blank:]]\+quiet\(.*\)$/\1\2/' /boot/grub/grub.cfg; \
     in-target sed -i '$ a cloud-user ALL=(ALL) NOPASSWD: ALL' /etc/sudoers; \
-    in-target sed -i 's/^\([[:blank:]]*user:[[:blank:]]\+\)ubuntu$/\1cloud-user/' /etc/cloud/cloud.cfg; \
-    in-target mv /etc/cloud/templates/sources.list.tmpl /etc/cloud/templates/sources.list.tmpl--disabled; \
+    in-target sed -i 's/^\([[:blank:]]*user:[[:blank:]]\+\)ubuntu$/\1cloud-user\napt_preserve_sources_list: 1/' /etc/cloud/cloud.cfg; \
     in-target mv /etc/cloud/templates/hosts.tmpl /etc/cloud/templates/hosts.tmpl--disabled; \
-    in-target sed -i '/^exit 0/ i /usr/sbin/ndisc_update' /etc/rc.local ;\
     in-target sed -i 's:mv -f \(\$new_resolv_conf\) /etc/resolv.conf:resolvconf -a ${interface}-v4 <\1:'  /sbin/dhclient-script; \
     in-target sed -i 's;\($RESOLVCONF -a\) $IFACE;sed "s/\\([^[:blank:]]\\+\\)\\./\\1/g"|\1 ${IFACE}-v6;'  /etc/wide-dhcpv6/dhcp6c-script; \
-    sed -i "/^exit 0/ i /usr/sbin/ndisc_update >dev/null 2>&1 &" /target/etc/wide-dhcpv6/dhcp6c-script; \
-    printf '/usr/sbin/duid-uuid-update\n' >> /target/etc/default/wide-dhcpv6-client; \
+    in-target sed -i '/^exit 0/ i /usr/sbin/ndisc_update' /etc/rc.local ;\
+    sed -i "/^exit 0/ i /usr/sbin/ndisc_update &" /target/etc/wide-dhcpv6/dhcp6c-script; \
+    printf '# duid-uuid-update - update DHCPv6 DUID to the type DUID-UUID from system GUID\n\ndescription "update DHCPv6 DUID"\n\nstart on mounted MOUNTPOINT=/\n\ntask\nconsole output\n\nexec duid-uuid-update\n' >/target/etc/init/duid-uuid-update.conf; \
+    printf '# resolvconf - setup resolvconf\n\ndescription "resolvconf init"\n\nstart on mounted MOUNTPOINT=/\n\ntask\nconsole output\n\nexec /etc/init.d/resolvconf start\n' >/target/etc/init/resolvconf.conf; \
     sed "/^127.0.0.1[[:blank:]]\+localhost/! s/^\(127.0.\(1\|0\).1[[:blank:]]\+\).*$/\1newborn/" /etc/hosts >/target/etc/hosts; \
     printf "newborn\n" > /target/etc/hostname; \
     printf 'auto lo\niface lo inet loopback\n\n' > /target/etc/network/interfaces; \
     printf 'auto eth0\niface eth0 inet manual\n'   >> /target/etc/network/interfaces; \
     printf ' pre-up avahi-autoipd -D $IFACE:avahi\n'   >> /target/etc/network/interfaces; \
-    printf ' pre-up duid-uuid-update ||:\n'   >> /target/etc/network/interfaces; \
     printf ' pre-up modprobe ipv6 ||:\n'   >> /target/etc/network/interfaces; \
     printf ' pre-up sysctl net.ipv6.conf.eth0.dad_transmits=0 ||:\n'   >> /target/etc/network/interfaces; \
-    printf ' pre-up dhcp6c eth0 -p /var/run/dhcp6c.$IFACE.pid ||:\n'   >> /target/etc/network/interfaces; \
     printf ' pre-down avahi-autoipd --kill $IFACE:avahi\n'   >> /target/etc/network/interfaces; \
-    printf ' pre-down kill `cat /var/run/dhcp6c.$IFACE.pid` ||:\n'   >> /target/etc/network/interfaces; \
     printf ' up dhclient3 -nw -e IF_METRIC=100 -pf /var/run/dhclient.$IFACE.pid -lf /var/lib/dhcp3/dhclient.$IFACE.leases $IFACE\n'   >> /target/etc/network/interfaces; \
     printf ' down dhclient3 -r -pf /var/run/dhclient.$IFACE.pid -lf /var/lib/dhcp3/dhclient.$IFACE.leases $IFACE\n'   >> /target/etc/network/interfaces; \
     printf "id-assoc na 0 { };\ninterface eth0\n{\n"                                     >/target/etc/wide-dhcpv6/dhcp6c.conf; \

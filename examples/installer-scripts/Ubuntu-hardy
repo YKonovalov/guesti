@@ -90,7 +90,7 @@ d-i base-installer/kernel/image string linux-image-server
 d-i grub-installer/timeout string 1
 d-i debian-installer/quiet boolean false
 d-i debian-installer/splash boolean false
-d-i debian-installer/add-kernel-opts string console=ttyS0,115200n8 console=tty0
+d-i debian-installer/add-kernel-opts string console=ttyS0,115200n8
 
 d-i debian-installer/exit/halt boolean true
 d-i finish-install/reboot_in_progress note
@@ -105,7 +105,7 @@ d-i preseed/late_command string \
     in-target update-rc.d -f wide-dhcpv6-client remove; \
     in-target update-rc.d wide-dhcpv6-client multiuser 14; \
     in-target update-rc.d -f resolvconf remove; \
-    in-target update-rc.d resolvconf multiuser 13; \
+    in-target update-rc.d resolvconf start 39 S .; \
     in-target rm -f /etc/network/if-up.d/wide-dhcpv6-client /etc/network/if-down.d/wide-dhcpv6-client; \
     in-target dpkg -r language-pack-gnome-en language-pack-gnome-en-base apparmor apparmor-utils; \
     in-target rm -f /etc/udev/rules.d/70-persistent-net.rules; \
