@@ -103,6 +103,7 @@ d-i preseed/late_command string \
     in-target invoke-rc.d apparmor stop; \
     in-target update-rc.d -f apparmor remove; \
     in-target update-rc.d -f wide-dhcpv6-client remove; \
+    in-target update-rc.d wide-dhcpv6-client multiuser 14; \
     in-target update-rc.d -f resolvconf remove; \
     in-target update-rc.d resolvconf multiuser 13; \
     in-target rm -f /etc/network/if-up.d/wide-dhcpv6-client /etc/network/if-down.d/wide-dhcpv6-client; \
@@ -121,17 +122,15 @@ d-i preseed/late_command string \
     in-target sed -i 's;\($RESOLVCONF -a\) $IFACE;sed "s/\\([^[:blank:]]\\+\\)\\./\\1/g"|\1 ${IFACE}-v6;'  /etc/wide-dhcpv6/dhcp6c-script; \
     sed "/^127.0.0.1[[:blank:]]\+localhost/! s/^\(127.0.\(1\|0\).1[[:blank:]]\+\).*$/\1newborn/" /etc/hosts >/target/etc/hosts; \
     sed -i "/^exit 0/ i /usr/sbin/ndisc_update >dev/null 2>&1 &" /target/etc/wide-dhcpv6/dhcp6c-script; \
+    printf '/usr/sbin/duid-uuid-update\n' >> /target/etc/default/wide-dhcpv6-client; \
     printf "newborn\n" > /target/etc/hostname; \
     printf "compat=1\n" > /target/etc/ec2-init/is-compat-env; \
     printf 'auto lo\niface lo inet loopback\n\n' > /target/etc/network/interfaces; \
     printf 'auto eth0\niface eth0 inet manual\n'   >> /target/etc/network/interfaces; \
     printf ' pre-up avahi-autoipd -D $IFACE:avahi\n'   >> /target/etc/network/interfaces; \
-    printf ' pre-up duid-uuid-update ||:\n'   >> /target/etc/network/interfaces; \
     printf ' pre-up modprobe ipv6 ||:\n'   >> /target/etc/network/interfaces; \
     printf ' pre-up sysctl net.ipv6.conf.eth0.dad_transmits=0 ||:\n'   >> /target/etc/network/interfaces; \
-    printf ' pre-up dhcp6c eth0 -p /var/run/dhcp6c.$IFACE.pid ||:\n'   >> /target/etc/network/interfaces; \
     printf ' pre-down avahi-autoipd --kill $IFACE:avahi\n'   >> /target/etc/network/interfaces; \
-    printf ' pre-down kill `cat /var/run/dhcp6c.$IFACE.pid` ||:\n'   >> /target/etc/network/interfaces; \
     printf ' up dhclient3 -nw -e IF_METRIC=100 -pf /var/run/dhclient.$IFACE.pid -lf /var/lib/dhcp3/dhclient.$IFACE.leases $IFACE\n'   >> /target/etc/network/interfaces; \
     printf ' down dhclient3 -r -pf /var/run/dhclient.$IFACE.pid -lf /var/lib/dhcp3/dhclient.$IFACE.leases $IFACE\n'   >> /target/etc/network/interfaces; \
     printf "id-assoc na 0 { };\ninterface eth0\n{\n"                                     >/target/etc/wide-dhcpv6/dhcp6c.conf; \
