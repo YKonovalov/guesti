@@ -57,10 +57,9 @@ d-i passwd/user-fullname string "default cloud user"
 d-i passwd/username string cloud-user
 d-i passwd/user-password-crypted string !!
 
-###
+### POSIX shell
+# also a hack in late_command is needed. see https://bugs.launchpad.net/ubuntu/+source/preseed/+bug/105539
 dash dash/sh boolean false
-tzdata tzdata/Zones/Europe select Moscow
-tzdata tzdata/Areas select Europe
 
 ## APT
 d-i apt-setup/security_host mirror.yandex.ru
@@ -103,6 +102,7 @@ tmpreaper tmpreaper/readsecurity_upgrading note
 
 # Clear network iface mapping; force network to wait for dhcp before cloud-init
 d-i preseed/late_command string \
+    in-target /var/lib/dpkg/info/dash.postinst; \
     in-target invoke-rc.d apparmor kill; \
     in-target update-rc.d -f apparmor remove; \
     in-target dpkg -r language-pack-gnome-en language-pack-gnome-en-base; \
